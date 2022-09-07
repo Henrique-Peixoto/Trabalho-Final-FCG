@@ -147,6 +147,7 @@ int main(int argc, char* argv[]) {
 
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
+    LoadShadersFromFiles();
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
