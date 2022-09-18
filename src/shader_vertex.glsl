@@ -3,6 +3,7 @@
 layout (location = 0) in vec4 model_coefficients;
 layout (location = 1) in vec4 normal_coefficients;
 layout (location = 2) in vec2 texture_coefficients;
+layout (location = 3) in vec3 color_coefficients;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -11,6 +12,7 @@ uniform mat4 projection;
 out vec4 position_world;
 out vec4 position_model;
 out vec4 normal;
+out vec3 rasterized_color;
 out vec2 texcoords;
 
 void main() {
@@ -22,5 +24,7 @@ void main() {
     normal.w = 0.0;
 
     texcoords = texture_coefficients;
+
+    rasterized_color = color_coefficients;
 }
 

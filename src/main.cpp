@@ -1,3 +1,4 @@
+#include <bits/stdc++.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +31,7 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+//#include "collisions.h"
 
 struct ObjModel {
     tinyobj::attrib_t attrib;
@@ -56,6 +58,7 @@ struct ObjModel {
 void PushMatrix(glm::mat4 M);
 void PopMatrix(glm::mat4& M);
 
+GLuint BuildPlatform();
 void BuildTrianglesAndAddToVirtualScene(ObjModel*);
 void ComputeNormals(ObjModel* model);
 void LoadShadersFromFiles();
@@ -64,6 +67,13 @@ GLuint LoadShader_Vertex(const char* filename);
 GLuint LoadShader_Fragment(const char* filename);
 void LoadShader(const char* filename, GLuint shader_id);
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id);
+void LoadAllObjFiles();
+glm::mat4 PlatformBaseModel();
+glm::mat4 PlayerBaseModel();
+void ApplyPlataformTransformation();
+void Draw(const char* objectName, glm::mat4 model);
+void DrawLevel2();
+void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t);
 
 // Funções callback para comunicação com o sistema operacional e interação do
 // usuário. Veja mais comentários nas definições das mesmas, abaixo.
@@ -73,6 +83,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+
+// Funções relacionadas às texturas
+void LoadTextureImage(const char* filename);
+void LoadAllTextures();
 
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
@@ -84,6 +98,8 @@ struct SceneObject {
     GLuint vertex_array_object_id;
     glm::vec3 bbox_min;
     glm::vec3 bbox_max;
+    glm::vec3 bottom_left_back;
+    glm::vec3 up_right_front;
 };
 
 // Abaixo definimos variáveis globais utilizadas em várias funções do código.
@@ -106,6 +122,45 @@ GLint object_id_uniform;
 GLint bbox_min_uniform;
 GLint bbox_max_uniform;
 
+// Número de texturas carregadas pela função LoadTextureImage()
+GLuint g_NumLoadedTextures = 0;
+
+// Variáveis usadas para controlar o movimento da câmera livre
+float g_CameraTheta = 0.8f; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi = 0.6f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 2.5f; // Distância da câmera para a origem
+
+// Variáveis que controlam a movimentação da câmera
+bool g_WPressed = false; // Andar para frente
+bool g_SPressed = false; // Andar para trás
+bool g_APressed = false; // Andar para esquerda
+bool g_DPressed = false; // Andar para direita
+bool g_SpacebarPressed = false; // Pular
+
+// Variável que controla a velocidade de movimento da câmera
+float cameraSpeed = 1.0f;
+
+// Variável que controla o estado do botão esquerdo do mouse
+bool g_LeftMouseButtonPressed = false;
+
+// Ângulos de Euler
+float g_AngleX = 0.0f;
+float g_AngleY = 0.0f;
+float g_AngleZ = 0.0f;
+
+// Controle dos valores de x e y do mouse
+double g_LastCursorPosX;
+double g_LastCursorPosY;
+
+// Posição atual do jogador e possível posição futura
+glm::vec4 g_PlayerPosition;
+glm::vec4 g_NewPlayerPosition;
+
+// Colisões
+std::map<std::string, bool> CheckCollision();
+void CalculateHitBox(std::string objName, float x, float y, float z);
+
+std::vector<SceneObject> g_HitBoxes;
 
 int main(int argc, char* argv[]) {
     int success = glfwInit();
@@ -135,10 +190,13 @@ int main(int argc, char* argv[]) {
     glfwSetMouseButtonCallback(window, MouseButtonCallback);
     glfwSetCursorPosCallback(window, CursorPosCallback);
     glfwSetScrollCallback(window, ScrollCallback);
+    glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
+
+    glfwSetWindowSize(window, 800, 800);
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
-    glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-    FramebufferSizeCallback(window, 800, 600);
+
+    //FramebufferSizeCallback(window, 800, 600);
 
     const GLubyte *vendor      = glGetString(GL_VENDOR);
     const GLubyte *renderer    = glGetString(GL_RENDERER);
@@ -147,16 +205,94 @@ int main(int argc, char* argv[]) {
 
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
+    LoadShadersFromFiles();
+
+    // Construindo uma plataforma
+    GLuint vertex_array_object_id = BuildPlatform();
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+    float previous_time = (float)glfwGetTime();
+    float current_time = (float)glfwGetTime();
+    float delta_t = current_time - previous_time;
+    previous_time = current_time;
+
+    //GLint model_uniform = glGetUniformLocation(program_id, "model");
+    GLint view_uniform = glGetUniformLocation(program_id, "view");
+    GLint projection_uniform = glGetUniformLocation(program_id, "projection");
+    //GLint render_as_black_uniform = glGetUniformLocation(program_id, "render_as_black");
+
+    if (argc > 1) {
+        ObjModel model(argv[1]);
+        BuildTrianglesAndAddToVirtualScene(&model);
+    }
+
+    LoadAllTextures();
+    LoadAllObjFiles();
+
+    g_PlayerPosition = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+    g_NewPlayerPosition = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+
     while (!glfwWindowShouldClose(window)) {
+        // Inicialização
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(program_id);
+
+        glBindVertexArray(vertex_array_object_id);
+
+        glm::mat4 model = Matrix_Identity()
+                        * Matrix_Translate(
+                            g_PlayerPosition.x,
+                            g_PlayerPosition.y,
+                            g_PlayerPosition.z
+                        );
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(object_id_uniform, 0);
+        DrawVirtualObject("player");
+
+        float r = g_CameraDistance;
+        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        float y = r*sin(g_CameraPhi);
+        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+
+        glm::vec4 camera_position_c = glm::vec4(x+g_PlayerPosition.x, y+g_PlayerPosition.y, z+g_PlayerPosition.z, 1.0f);
+        glm::vec4 camera_lookat_l = g_PlayerPosition;
+        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+
+        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        glUniformMatrix4fv(view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+
+        // vvvvvvvv Cálculos relacionados à matriz "projection" vvvvvvvv
+        glm::mat4 projection;
+        // O bloco deve se mover como uma câmera livre ao pressionar as teclas
+        // WASD. Quando o mouse for movido, deve ser aplicada uma câmera look-at com o bloco (personagem) centralizado.
+
+        float nearplane = -0.1f;
+        float farplane = -30.0f;
+
+        float fieldOfView = 3.141592 / 3.0f;
+        projection = Matrix_Perspective(fieldOfView, g_ScreenRatio, nearplane, farplane);
+        glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, glm::value_ptr(projection));
+        // ^^^^^^^^^ Cálculos relacionados à matriz "projection" ^^^^^^^^^
+
+        DrawLevel2();
+        MovePlayer(camera_view_vector, camera_up_vector, delta_t);
+        std::map<std::string, bool> collisions = CheckCollision();
+        if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
+            g_NewPlayerPosition = glm::vec4(g_NewPlayerPosition.x, g_NewPlayerPosition.y-(delta_t*cameraSpeed*3), g_NewPlayerPosition.z, g_NewPlayerPosition.w);
+        }
+        g_PlayerPosition = g_NewPlayerPosition;
+
+        glBindVertexArray(0);
+
+        current_time = glfwGetTime();
+        delta_t = current_time - previous_time;
+        previous_time = current_time;
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -167,6 +303,118 @@ int main(int argc, char* argv[]) {
 
     // Fim do programa
     return 0;
+}
+
+std::map<std::string, bool> CheckCollision() {
+    bool collisionX = false;
+    bool collisionY = false;
+    bool collisionZ = false;
+    SceneObject &player = g_VirtualScene["player"];
+
+    for (SceneObject platform : g_HitBoxes) {
+        player.bottom_left_back = glm::vec3(
+            g_NewPlayerPosition.x+player.bbox_min.x,
+            g_NewPlayerPosition.y+player.bbox_min.y,
+            g_NewPlayerPosition.z+player.bbox_min.z
+        );
+        player.up_right_front = glm::vec3(
+            g_NewPlayerPosition.x+player.bbox_max.x,
+            g_NewPlayerPosition.y+player.bbox_max.y,
+            g_NewPlayerPosition.z+player.bbox_max.z
+        );
+
+        collisionX = player.up_right_front.x >= platform.bottom_left_back.x
+                   && platform.up_right_front.x >= player.bottom_left_back.x;
+        collisionY = player.up_right_front.y >= platform.bottom_left_back.y
+                   && platform.up_right_front.y >= player.bottom_left_back.y;
+        collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
+                   && platform.up_right_front.z >= player.bottom_left_back.z;
+
+       if (collisionX && collisionY && collisionZ) break;
+    }
+
+    std::map<std::string, bool> collisions;
+    collisions["x"] = collisionX;
+    collisions["y"] = collisionY;
+    collisions["z"] = collisionZ;
+
+    return collisions;
+}
+
+void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t) {
+        glm::vec4 wsMoveDirection = glm::vec4(camera_view_vector.x, 0.0f, camera_view_vector.z, 0.0f);
+        if (g_WPressed) g_NewPlayerPosition = g_PlayerPosition + wsMoveDirection * cameraSpeed * delta_t;
+        if (g_SPressed) g_NewPlayerPosition = g_PlayerPosition - wsMoveDirection * cameraSpeed * delta_t;
+
+        glm::vec4 sideVector = crossproduct(camera_view_vector, camera_up_vector);
+        glm::vec4 adMoveDirection = glm::vec4(sideVector.x, 0.0f, sideVector.z, 0.0f);
+        if (g_APressed) g_NewPlayerPosition = g_PlayerPosition - adMoveDirection * cameraSpeed * delta_t;
+        if (g_DPressed) g_NewPlayerPosition = g_PlayerPosition + adMoveDirection * cameraSpeed * delta_t;
+
+// quando pular, marcar o tempo
+// depois de passado um determinado intervalo, pode pular de novo
+        if (g_SpacebarPressed) g_NewPlayerPosition = glm::vec4(
+            g_NewPlayerPosition.x, 
+            g_NewPlayerPosition.y + 0.1f, 
+            g_NewPlayerPosition.z, 
+            g_NewPlayerPosition.w
+        );
+}
+
+void LoadAllTextures() {
+    LoadTextureImage("../../data/level2-platform-texture.jpg");
+}
+
+glm::mat4 PlatformBaseModel() {
+    glm::mat4 model = Matrix_Identity()
+                    * Matrix_Translate(0.0f, 0.0f, 0.0f);
+                    //Matrix_Scale(0.5f, 0.5f, 0.5f);
+
+    return model;
+}
+
+glm::mat4 PlayerBaseModel() {
+    glm::mat4 model = Matrix_Identity()
+                    * Matrix_Translate(0.0f, 1.5f, 0.0f);
+                    //Matrix_Scale(0.25f, 0.5f, 0.25f);
+
+    return model;
+}
+
+void CalculateHitBox(std::string objName, float x, float y, float z) {
+    SceneObject &obj = g_VirtualScene[objName];
+    obj.bottom_left_back = glm::vec3(
+        x+obj.bbox_min.x, 
+        y+obj.bbox_min.y, 
+        z+obj.bbox_min.z
+    );
+    obj.up_right_front = glm::vec3(
+        x+obj.bbox_max.x, 
+        y+obj.bbox_max.y, 
+        z+obj.bbox_max.z
+    );
+}
+
+void ApplyPlataformTransformation() {
+    CalculateHitBox("platform", 0.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    glm::mat4 model = PlatformBaseModel() * Matrix_Translate(0.0f, 2.0f, 0.0f);
+    Draw("platform", model);
+
+    CalculateHitBox("platform", 5.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(5.0f, 2.0f, 0.0f);
+    Draw("platform", model);
+}
+
+void Draw(const char* objectName, glm::mat4 model) {
+    glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(object_id_uniform, 0);
+    DrawVirtualObject(objectName);
+}
+
+void DrawLevel2() {
+    ApplyPlataformTransformation();
 }
 
 void DrawVirtualObject(const char* object_name) {
@@ -204,8 +452,6 @@ void LoadShadersFromFiles() {
 
     glUseProgram(program_id);
     glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
     glUseProgram(0);
 }
 
@@ -269,6 +515,131 @@ void ComputeNormals(ObjModel* model) {
         model->attrib.normals[3*i + 1] = n.y;
         model->attrib.normals[3*i + 2] = n.z;
     }
+}
+
+GLuint BuildPlatform() {
+    GLfloat cube_model_coefficients[] = {
+        -0.5f,  0.5f,  0.5f, 1.0f,
+        -0.5f, -0.5f,  0.5f, 1.0f,
+         0.5f, -0.5f,  0.5f, 1.0f,
+         0.5f,  0.5f,  0.5f, 1.0f,
+        -0.5f,  0.5f, -0.5f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 1.0f,
+         0.5f, -0.5f, -0.5f, 1.0f,
+         0.5f,  0.5f, -0.5f, 1.0f,
+         0.0f,  0.0f,  0.0f, 1.0f,
+         1.0f,  0.0f,  0.0f, 1.0f,
+         0.0f,  0.0f,  0.0f, 1.0f,
+         0.0f,  1.0f,  0.0f, 1.0f,
+         0.0f,  0.0f,  0.0f, 1.0f,
+         0.0f,  0.0f,  1.0f, 1.0f,
+    };
+
+    GLuint VBO_cube_model_coefficients_id;
+    glGenBuffers(1, &VBO_cube_model_coefficients_id);
+
+    GLuint cube_vertex_array_object_id;
+    glGenVertexArrays(1, &cube_vertex_array_object_id);
+
+    glBindVertexArray(cube_vertex_array_object_id);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_cube_model_coefficients_id);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_model_coefficients), NULL, GL_STATIC_DRAW);
+
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cube_model_coefficients), cube_model_coefficients);
+
+    GLuint location = 0;
+    GLint number_of_dimensions = 4;
+    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glEnableVertexAttribArray(location);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    GLfloat cube_color_coefficients[] = {
+        1.0f, 0.5f, 0.0f,
+        1.0f, 0.5f, 0.0f,
+        0.0f, 0.5f, 1.0f,
+        0.0f, 0.5f, 1.0f,
+        1.0f, 0.5f, 0.0f,
+        1.0f, 0.5f, 0.0f,
+        0.0f, 0.5f, 1.0f,
+        0.0f, 0.5f, 1.0f,
+        1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f,
+    };
+    GLuint VBO_cube_color_coefficients_id;
+    glGenBuffers(1, &VBO_cube_color_coefficients_id);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_cube_color_coefficients_id);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_color_coefficients), NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cube_color_coefficients), cube_color_coefficients);
+    location = 3;
+    number_of_dimensions = 3;
+    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(location);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    GLuint indices[] = {
+        0, 1, 2,
+        7, 6, 5,
+        3, 2, 6,
+        4, 0, 3,
+        4, 5, 1,
+        1, 5, 6,
+        0, 2, 3,
+        7, 5, 4,
+        3, 6, 7,
+        4, 3, 7,
+        4, 1, 0,
+        1, 6, 2,
+        0, 1,
+        1, 2,
+        2, 3,
+        3, 0,
+        0, 4,
+        4, 7,
+        7, 6,
+        6, 2,
+        6, 5,
+        5, 4,
+        5, 1,
+        7, 3,
+        8 , 9 ,
+        10, 11,
+        12, 13
+    };
+
+    SceneObject cube_faces;
+    cube_faces.name = "Cubo (faces coloridas)";
+    cube_faces.first_index = 0;
+    cube_faces.num_indices = 36;
+    cube_faces.rendering_mode = GL_TRIANGLES;
+    g_VirtualScene["cube_faces"] = cube_faces;
+
+    GLuint indices_id;
+    glGenBuffers(1, &indices_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(indices), indices);
+
+    glBindVertexArray(0);
+
+    return cube_vertex_array_object_id;
+}
+
+void LoadAllObjFiles() {
+    ObjModel platform("../../data/platform.obj");
+    ComputeNormals(&platform);
+    BuildTrianglesAndAddToVirtualScene(&platform);
+
+    ObjModel player("../../data/player.obj");
+    ComputeNormals(&player);
+    BuildTrianglesAndAddToVirtualScene(&player);
 }
 
 void BuildTrianglesAndAddToVirtualScene(ObjModel* model) {
@@ -414,6 +785,53 @@ GLuint LoadShader_Fragment(const char* filename) {
     return fragment_shader_id;
 }
 
+void LoadTextureImage(const char* filename) {
+    printf("Carregando imagem \"%s\"... ", filename);
+
+    stbi_set_flip_vertically_on_load(true);
+    int width;
+    int height;
+    int channels;
+    unsigned char *data = stbi_load(filename, &width, &height, &channels, 3);
+
+    if (data == NULL) {
+        fprintf(stderr, "ERROR: Cannot open image file \"%s\".\n", filename);
+        std::exit(EXIT_FAILURE);
+    }
+
+    printf("OK (%dx%d).\n", width, height);
+
+    GLuint texture_id;
+    GLuint sampler_id;
+    glGenTextures(1, &texture_id);
+    glGenSamplers(1, &sampler_id);
+
+
+    glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+    glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+
+    GLuint textureunit = g_NumLoadedTextures;
+    glActiveTexture(GL_TEXTURE0 + textureunit);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glBindSampler(textureunit, sampler_id);
+
+    stbi_image_free(data);
+
+    g_NumLoadedTextures += 1;
+}
+
 void LoadShader(const char* filename, GLuint shader_id) {
     std::ifstream file;
     try {
@@ -510,17 +928,47 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height) {
     g_ScreenRatio = (float)width / height;
 }
 
-
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
+        g_LeftMouseButtonPressed = true;
+    }
 
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        g_LeftMouseButtonPressed = false;
+    }
 }
 
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    if (!g_LeftMouseButtonPressed) return;
 
+    // Deslocamento do cursor do mouse em x e y de coordenadas de tela
+    float dx = xpos - g_LastCursorPosX;
+    float dy = ypos - g_LastCursorPosY;
+
+    // Atualizamos parâmetros da câmera com os deslocamentos
+    g_CameraTheta -= 0.003f*dx;
+    g_CameraPhi += 0.003f*dy;
+
+    // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
+    float phimax = 3.141592f/2;
+    float phimin = -phimax;
+
+    if (g_CameraPhi > phimax) g_CameraPhi = phimax;
+    if (g_CameraPhi < phimin) g_CameraPhi = phimin;
+
+    // Atualizamos as variáveis globais para armazenar a posição atual do
+    // cursor como sendo a última posição conhecida do cursor.
+    g_LastCursorPosX = xpos;
+    g_LastCursorPosY = ypos;
 }
 
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    g_CameraDistance -= 0.1f*yoffset;
 
+    const float verysmallnumber = std::numeric_limits<float>::epsilon();
+    if (g_CameraDistance < verysmallnumber)
+        g_CameraDistance = verysmallnumber;
 }
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod) {
@@ -528,14 +976,61 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         if (key == GLFW_KEY_0 + i && action == GLFW_PRESS && mod == GLFW_MOD_SHIFT)
             std::exit(100 + i);
 
+    // Pressionar ESC fecha a janela onde roda a aplicação
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GL_TRUE);
     }
 
+    // Pressionar R recarrega os shaders
     if (key == GLFW_KEY_R && action == GLFW_PRESS) {
         LoadShadersFromFiles();
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
+    }
+
+    // Pressionar W faz o jogador andar para frente
+    if (key == GLFW_KEY_W) {
+        if (action == GLFW_PRESS) {
+            g_WPressed = true;
+        } else if (action == GLFW_RELEASE) {
+            g_WPressed = false;
+        }
+    }
+
+    // Pressionar S faz o jogador andar para trás
+    if (key == GLFW_KEY_S) {
+        if (action == GLFW_PRESS) {
+            g_SPressed = true;
+        } else if (action == GLFW_RELEASE) {
+            g_SPressed = false;
+        }
+    }
+
+    // Pressionar A faz o jogador andar para esquerda
+    if (key == GLFW_KEY_A) {
+        if (action == GLFW_PRESS) {
+            g_APressed = true;
+        } else if (action == GLFW_RELEASE) {
+            g_APressed = false;
+        }
+    }
+
+    // Pressionar D faz o jogador andar para direita
+    if (key == GLFW_KEY_D) {
+        if (action == GLFW_PRESS) {
+            g_DPressed = true;
+        } else if (action == GLFW_RELEASE) {
+            g_DPressed = false;
+        }
+    }
+
+    // Pressionar a barra de espaço faz o jogador pular
+    if (key == GLFW_KEY_SPACE) {
+        if (action == GLFW_PRESS) {
+            g_SpacebarPressed = true;
+        } else if (action == GLFW_RELEASE) {
+            g_SpacebarPressed = false;
+        }
     }
 }
 
