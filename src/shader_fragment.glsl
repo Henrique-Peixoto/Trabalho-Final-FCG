@@ -4,6 +4,7 @@ in vec4 position_world;
 in vec4 normal;
 in vec4 position_model;
 in vec3 rasterized_color;
+in vec3 vertex_color;
 in vec2 texcoords;
 
 uniform mat4 model;
@@ -76,7 +77,7 @@ void main() {
         Ks = vec3(0.01,0.0,0.0);
         Ka = vec3(0.2,0.1,0.0);
         Kd0 = texture(PlayerTexture, vec2(U,V)).rgb;
-    } else {
+    } else if (object_id == KEY) {
         Kd = vec3(1.0,1.0,0.0);
         Ks = vec3(0.01,0.01,0.0);
         Ka = vec3(1.0,1.0,0.0);
@@ -100,11 +101,14 @@ void main() {
     vec3 specular_term = Ks*I*pow(dot(n, h), qLine);
 
     if (object_id == KEY) {
-        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + specular_term;
+        // Aplicando o modelo de iluminação de Blinn-Phong no objeto da chave
+        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + specular_term + vertex_color;
+    } else if (object_id != PLAYER) {
+        // Aplicando o modelo de iluminação de Phong nos objetos da cena
+        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + vertex_color;
     } else {
-        color.rgb = Kd0 + ambient_term + lambert_diffuse_term;
+        color.rgb = vertex_color + Kd0;
     }
 
-    //color.rgb = rasterized_color;
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
 }
