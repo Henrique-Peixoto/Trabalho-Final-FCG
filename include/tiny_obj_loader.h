@@ -38,6 +38,7 @@ THE SOFTWARE.
 #include <map>
 #include <string>
 #include <vector>
+#include <iostream>
 
 namespace tinyobj {
 
@@ -967,7 +968,11 @@ bool MaterialFileReader::operator()(const std::string &matId,
     filepath = matId;
   }
 
+
+  std::string filep= "../../data/" + filepath;
+  filepath = filep;
   std::ifstream matIStream(filepath.c_str());
+  std::cout << "Path of material: " << filepath << std::endl;
   LoadMtl(matMap, materials, &matIStream);
   if (!matIStream) {
     std::stringstream ss;

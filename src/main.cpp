@@ -30,6 +30,8 @@
 #include <stdexcept>
 #include <algorithm>
 #include <iostream>
+#include <set>
+#include <utility>
 // Headers das bibliotecas OpenGL
 #include <glad/glad.h>   // Criação de contexto OpenGL 3.3
 #include <GLFW/glfw3.h>  // Criação de janelas do sistema operacional
@@ -121,6 +123,17 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
+void LoadAllObjFiles();
+glm::mat4 PlatformBaseModel();
+void ApplyPlataformTransformation();
+void Draw(const char* objectName, glm::mat4 model, int objectNumber);
+void DrawLevel2();
+void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t);
+
+// Funções relacionadas às texturas
+void LoadTextureImage(const char* filename);
+void LoadAllTextures();
+
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
 struct SceneObject
@@ -132,6 +145,8 @@ struct SceneObject
     GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
     glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
     glm::vec3    bbox_max;
+    glm::vec3 bottom_left_back;
+    glm::vec3 up_right_front;
 };
 
 // Abaixo definimos variáveis globais utilizadas em várias funções do código.
@@ -167,8 +182,14 @@ float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 float g_CameraX = 0.0f;
-float g_CameraY = 0.0f;
-float g_CameraZ = -20.0f;
+float g_CameraY = 10.0f;
+float g_CameraZ = 0.0f;
+
+// Posição atual do jogador e possível posição futura
+glm::vec4 g_PlayerPosition;
+glm::vec4 g_NewPlayerPosition = glm::vec4(g_CameraX, g_CameraY, g_CameraZ, 1.0f);;
+
+glm::vec4 camera_position_c;
 
 bool isMovingRight = false;
 bool isMovingForward = false;
@@ -178,8 +199,11 @@ bool isMovingLeft = false;
 bool g_UsePerspectiveProjection = true;
 
 // Variável que controla se o texto informativo será mostrado na tela.
-bool g_ShowInfoText = true;
+bool g_ShowInfoText = false;
 
+bool touchedGround = false;
+
+float oldAngle = 0.0f;
 // Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
 GLuint vertex_shader_id;
 GLuint fragment_shader_id;
@@ -195,94 +219,428 @@ GLint bbox_max_uniform;
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
 
-  #define SPHERE 0
-        #define BUNNY  1
-        #define PLANE  2
-        #define WALL 3
-        #define CRATE 4
-        #define BARREL 5
+// Variáveis que controlam a movimentação da câmera
+bool g_WPressed = false; // Andar para frente
+bool g_SPressed = false; // Andar para trás
+bool g_APressed = false; // Andar para esquerda
+bool g_DPressed = false; // Andar para direita
+bool g_SpacebarPressed = false; // Pular
 
-void drawPlatform(float length, float width,float height, float x, float y, float z){
+// IDs dos objetos
+#define PLATFORM 0
+#define PLAYER 1
+#define KEY 2
+#define CANNON 3
 
-    glm::mat4 model = Matrix_Identity(); 
-    // Desenhamos o plano parede de baixo
-        model = Matrix_Translate(x,y+height,z)
-                *Matrix_Scale(width,1.0f,length);
+// Valores de tempo
+float g_CurrentTime = 0;
+float g_LastTimeJumped = 0;
 
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
 
-        // Desenhamos o plano parede de cima
-        model = Matrix_Translate(x,y-height,z)
-                *Matrix_Scale(width,1.0f,length)
-                *Matrix_Rotate_Z(PI);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+float cameraSpeed = 1.0f;
+float delta_t;
 
-         // Desenhamos o plano parede da frente
-        model = Matrix_Translate(x,y,z-length)
-                *Matrix_Scale(width,height,1.0f)
-                *Matrix_Rotate_X(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+glm::vec4 turretVector = glm::vec4(1.0f,0.0f,0.0f,0.0f);
+glm::vec3 turrentPosition = glm::vec3(8.0f,3.0f,4.0f);
 
-        // Desenhamos o plano parede de tras
-        model = Matrix_Translate(x,y,z+length)
-                *Matrix_Scale(width,height,1.0f)
-                *Matrix_Rotate_X(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-        // Desenhamos o plano do parede esquerda
-        model = Matrix_Translate(x-width,y,z)
-                *Matrix_Scale(width,height,length)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+glm::vec4 turretVector2 = glm::vec4(1.0f,0.0f,0.0f,0.0f);
+glm::vec3 turrentPosition2 = glm::vec3(-20.0f,6.0f,20.0f);
 
-        //Parede Direita
-        model = Matrix_Translate(x+width,y,z)
-                *Matrix_Scale(width,height,length)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+glm::vec4 turretVector3 = glm::vec4(1.0f,0.0f,0.0f,0.0f);
+glm::vec3 turrentPosition3 = glm::vec3(12.0f, 9.0f, 16.0f);
+
+typedef struct cameraPlayer{
+        glm::vec3 bottom_left_back;
+        glm::vec3 up_right_front;
+}CameraPlayer;
+
+CameraPlayer player;
+
+// Colisões
+std::map<std::string, bool> CheckCollision();
+bool CheckBulletCollision();
+void CalculateHitBox(std::string objName, float x, float y, float z, float scaleFactorX = 1.0, float scaleFactorY = 1.0, float scaleFactorZ = 1.0);
+std::vector<SceneObject> g_HitBoxes;
+
+
+void LoadAllTextures() {
+    LoadTextureImage("../../data/level2-platform-texture.jpg");
+    LoadTextureImage("../../data/level2-key-texture.jpg");
+    LoadTextureImage("../../data/10471_Laser_Turret_v1_Diffuse.jpg");
+}
+
+void LoadAllObjFiles() {
+    ObjModel platform("../../data/platform.obj");
+    ComputeNormals(&platform);
+    BuildTrianglesAndAddToVirtualScene(&platform);
+
+    ObjModel key("../../data/key.obj");
+    ComputeNormals(&key);
+    BuildTrianglesAndAddToVirtualScene(&key);
+
+    ObjModel cannon("../../data/turret.obj");
+    ComputeNormals(&cannon);
+    BuildTrianglesAndAddToVirtualScene(&cannon);
+
+    ObjModel sphere("../../data/sphere.obj");
+    ComputeNormals(&sphere);
+    BuildTrianglesAndAddToVirtualScene(&sphere);
+
 }
 
 
-void drawStairs(float length, float width, float height, float x, float y, float z){
-    drawPlatform(length,width,height,x,y,z);
-    drawPlatform(length,width,height,x,y+0.8f,z+2.0f*length);
-    drawPlatform(length,width,height,x,y+1.6f,z+4.0f*length);
-    drawPlatform(length,width,height,x,y+2.4f,z+6.0f*length);
+glm::mat4 PlatformBaseModel() {
+    glm::mat4 model = Matrix_Identity()
+                    * Matrix_Translate(0.0f, 0.0f, 0.0f);
+                    //Matrix_Scale(0.5f, 0.5f, 0.5f);
+
+    return model;
 }
 
-void drawBox(float x,float y, float z){
-    glm::mat4 model = Matrix_Identity(); 
-    model = Matrix_Translate(x,y,z);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, CRATE);
-        DrawVirtualObject("crate");
+glm::mat4 CannonBaseModel(){
+    glm::mat4 model = Matrix_Identity()
+                        * Matrix_Translate(0.0f, 0.0f, 0.0f);
+                        //Matrix_Scale(0.5f, 0.5f, 0.5f);
+
+    return model;
+
 }
 
-void drawBoxHorizontalLine(float x, float y, float z, int qt){
-    for(int i=0;i<qt;i++){
-        drawBox(x-2.0f*i,y,z);
+
+void CalculateHitBox(std::string objName, float x, float y, float z, float scaleFactorX /*= 1.0*/, float scaleFactorY /* = 1.0*/, float scaleFactorZ /*= 1.0*/) {
+    SceneObject &obj = g_VirtualScene[objName];
+    obj.bottom_left_back = glm::vec3(
+        x+obj.bbox_min.x*scaleFactorX, 
+        y+obj.bbox_min.y*scaleFactorY, 
+        z+obj.bbox_min.z*scaleFactorZ
+    );
+    obj.up_right_front = glm::vec3(
+        x+obj.bbox_max.x*scaleFactorX, 
+        y+obj.bbox_max.y*scaleFactorY, 
+        z+obj.bbox_max.z*scaleFactorZ
+    );
+}
+
+float spherePositionX = 0.0f;
+
+typedef struct spawnAttr{
+    glm::vec3 spawnPos;
+    glm::vec3 spawnVec;
+}SPAWNATTR;
+//Posicao , vetor
+std::vector<SPAWNATTR> bulletPosition;
+
+void ApplyPlataformTransformation() {
+    CalculateHitBox("platform", 0.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    glm::mat4 model = PlatformBaseModel() * Matrix_Translate(0.0f, 2.0f, 0.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 0.0f, 2.0f, 4.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(0.0f, 2.0f, 4.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 0.0f, 2.0f, 8.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(0.0f, 2.0f, 8.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 2.0f, 8.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 2.0f, 8.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -8.0f, 3.0f, 8.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-8.0f, 3.0f, 8.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 4.0f, 8.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 4.0f, 8.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 4.0f, 12.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 4.0f, 12.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 5.0f, 16.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 5.0f, 16.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 5.0f, 20.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 5.0f, 20.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 5.0f, 24.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 5.0f, 24.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -12.0f, 5.0f, 28.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-12.0f, 5.0f, 28.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -8.0f, 6.0f, 28.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-8.0f, 6.0f, 28.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -8.0f, 6.0f, 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-8.0f, 6.0f, 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 7.0f, 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 7.0f, 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 0.0f, 7.0f, 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(0.0f, 7.0f, 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 7.0f, 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 7.0f, 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 8.0f, 28.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 8.0f, 28.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 8.0f, 24.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 8.0f, 24.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 8.0f, 20.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 8.0f, 20.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 8.0f, 16.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 8.0f, 16.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 0.0f, 8.0f, 16.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(0.0f, 8.0f, 16.0f);
+    Draw("platform", model, PLATFORM);
+
+
+    //CalculateHitBox("platform", 12.0f, 9.0f, 16.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(12.0f, 8.8f, 16.0f);
+    Draw("platform", model, PLATFORM);
+
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-20.0f,5.8f,20.0f);
+    Draw("platform", model, PLATFORM);
+
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f,2.8f,4.0f);
+    Draw("platform", model, PLATFORM);
+
+
+    CalculateHitBox("platform", -4.0f, 7.5f, 15.0f, 3.2, 1.0, 3.2);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 7.5f, 15.0f) * Matrix_Scale(3.2, 1, 3.2);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 8.0f, 15.0f, 2.0, 1.0, 2.0);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 8.0f, 15.0f) * Matrix_Scale(2, 1, 2);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 8.5f, 15.0f, 1.5, 1.0, 1.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 8.5f, 15.0f) * Matrix_Scale(1.5, 1, 1.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 9.0f, 15.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.0f, 15.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 9.0f, 15.0f, 0.5, 2.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.0f, 15.0f) * Matrix_Scale(0.5, 2, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -1.5f, 9.75f, 17.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-1.5f, 9.75f, 17.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -6.5f, 9.75f, 17.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-6.5f, 9.75f, 17.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -1.5f, 9.75f, 12.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-1.5f, 9.75f, 12.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -6.5f, 9.75f, 12.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-6.5f, 9.75f, 12.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("key", -4.0f, 14.0f, 15.0f);
+    g_HitBoxes.push_back(g_VirtualScene["key"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.75f, 15.0f) * Matrix_Rotate_Y(3.1415/2) * Matrix_Rotate_Z(3.1415/2) * Matrix_Scale(0.25, 0.25, 0.25);
+    Draw("key", model, KEY);
+
+    glm::vec3 newVector = turrentPosition - glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+    glm::vec3 vecPos = glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+
+    model = CannonBaseModel() * Matrix_Translate(turrentPosition.x,turrentPosition.y,turrentPosition.z)*Matrix_Scale(0.001f,0.001f,0.001f)*glm::inverse(glm::lookAt(glm::vec3(turrentPosition.x,0.0f,turrentPosition.z), vecPos, glm::vec3(0.0f,1.0f,0.0f)))*Matrix_Rotate_X(-3.1415f/2)*Matrix_Rotate_Z(-3.1415f);
+    Draw("cannon",model,CANNON);
+
+    glm::vec3 newVector2 = turrentPosition2 - glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+    glm::vec3 vecPos2 = glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+
+    model = CannonBaseModel() * Matrix_Translate(turrentPosition2.x,turrentPosition2.y,turrentPosition2.z)*Matrix_Scale(0.001f,0.001f,0.001f)*glm::inverse(glm::lookAt(glm::vec3(turrentPosition2.x,0.0f,turrentPosition2.z), vecPos2, glm::vec3(0.0f,1.0f,0.0f)))*Matrix_Rotate_X(-3.1415f/2)*Matrix_Rotate_Z(-3.1415f);
+    Draw("cannon",model,CANNON);
+
+    glm::vec3 newVector3 = turrentPosition3 - glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+    glm::vec3 vecPos3 = glm::vec3(camera_position_c.x,0.0f,camera_position_c.z);
+
+    model = CannonBaseModel() * Matrix_Translate(turrentPosition3.x,turrentPosition3.y,turrentPosition3.z)*Matrix_Scale(0.001f,0.001f,0.001f)*glm::inverse(glm::lookAt(glm::vec3(turrentPosition3.x,0.0f,turrentPosition3.z), vecPos3, glm::vec3(0.0f,1.0f,0.0f)))*Matrix_Rotate_X(-3.1415f/2)*Matrix_Rotate_Z(-3.1415f);
+    Draw("cannon",model,CANNON);
+
+
+    for(auto bPos:bulletPosition){
+        model = CannonBaseModel() * Matrix_Translate(bPos.spawnPos.x,bPos.spawnPos.y,bPos.spawnPos.z) * Matrix_Scale(0.1f,0.1f,0.1f);
+        Draw("sphere",model,CANNON);
+    }
+
+}
+
+void Draw(const char* objectName, glm::mat4 model, int objectNumber) {
+    glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform1i(object_id_uniform, objectNumber);
+    DrawVirtualObject(objectName);
+}
+
+void DrawLevel2() {
+    ApplyPlataformTransformation();
+}
+
+void MoveBullet(){
+
+    for(int i=0;i<bulletPosition.size();i++){
+        bulletPosition[i].spawnPos = bulletPosition[i].spawnPos + bulletPosition[i].spawnVec*delta_t;
     }
 }
 
-void drawBoxStraightLine(float x, float y, float z, int qt){
-    for(int i=0;i<qt;i++){
-        drawBox(x,y,z+2*i);
-    }
+void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t) {
+        glm::vec4 camera_view_vector_n = normalize(camera_view_vector);
+        camera_view_vector_n = glm::vec4(camera_view_vector_n.x*3, camera_view_vector_n.y*3, camera_view_vector_n.z*3, camera_view_vector_n.w);
+        glm::vec4 wsMoveDirection = glm::vec4(camera_view_vector_n.x, 0.0f, camera_view_vector_n.z, 0.0f);
+        if (g_WPressed) g_NewPlayerPosition = camera_position_c + wsMoveDirection * cameraSpeed * delta_t;
+        if (g_SPressed) g_NewPlayerPosition = camera_position_c - wsMoveDirection * cameraSpeed * delta_t;
+
+        glm::vec4 sideVector = crossproduct(camera_view_vector_n, camera_up_vector);
+        glm::vec4 adMoveDirection = glm::vec4(sideVector.x, 0.0f, sideVector.z, 0.0f);
+        if (g_APressed) g_NewPlayerPosition = camera_position_c - adMoveDirection * cameraSpeed * delta_t;
+        if (g_DPressed) g_NewPlayerPosition = camera_position_c + adMoveDirection * cameraSpeed * delta_t;
+
+        if (g_SpacebarPressed) g_NewPlayerPosition = glm::vec4(
+            g_NewPlayerPosition.x, 
+            g_NewPlayerPosition.y + 0.15f, 
+            g_NewPlayerPosition.z, 
+            g_NewPlayerPosition.w
+        );
 }
 
+std::map<std::string, bool> CheckCollision() {
+    bool collisionX = false;
+    bool collisionY = false;
+    bool collisionZ = false;
+    //SceneObject &player = g_VirtualScene["player"];
+
+    
+    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+
+    for (SceneObject platform : g_HitBoxes) {
+
+        collisionX = player.up_right_front.x >= platform.bottom_left_back.x
+                   && platform.up_right_front.x >= player.bottom_left_back.x;
+        collisionY = player.up_right_front.y >= platform.bottom_left_back.y
+                   && platform.up_right_front.y >= player.bottom_left_back.y;
+        collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
+                   && platform.up_right_front.z >= player.bottom_left_back.z;
+
+       if (collisionX && collisionY && collisionZ) break;
+    }
+    if (collisionX && collisionY && collisionZ)
+        touchedGround = true;
+    else
+        touchedGround = false;
+
+    std::map<std::string, bool> collisions;
+    collisions["x"] = collisionX;
+    collisions["y"] = collisionY;
+    collisions["z"] = collisionZ;
+
+    return collisions;
+}
+inline float squared(float v) { return v * v; }
+bool CheckBulletCollision() {
+    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+
+
+    int idx = 0;
+    bool colidiu = false;
+    bool popFront = false;
+    std::vector<SPAWNATTR> newBulletPosition;
+    for(int i=0;i<bulletPosition.size();i++){
+        SPAWNATTR bPos = bulletPosition[i];
+        float sphereXDistance = abs(bPos.spawnPos.x - camera_position_c.x);
+        float sphereYDistance = abs(bPos.spawnPos.y - camera_position_c.y);
+        float sphereZDistance = abs(bPos.spawnPos.z - camera_position_c.z);
+
+        
+   
+        float cornerDistance_sq = ((sphereXDistance) * (sphereXDistance)) +
+                         ((sphereYDistance) * (sphereYDistance) +
+                         ((sphereZDistance) * (sphereZDistance)));
+        colidiu |= (cornerDistance_sq < (0.4f * 0.4f));
+        if(cornerDistance_sq < 200.0f){
+            newBulletPosition.push_back(bulletPosition[i]);
+        }
+    }
+    bulletPosition = newBulletPosition;
+
+
+    return colidiu;
+
+}
+
+void spawnBullet(glm::vec3 spawnPos, glm::vec3 spawnVec){
+    SPAWNATTR sp;
+    sp.spawnPos = spawnPos;
+    sp.spawnVec = spawnVec;
+    bulletPosition.push_back(sp);
+}
+
+void diedRoutine(){
+    g_NewPlayerPosition = glm::vec4(0.0f,5.0f,0.0f,1.0f);
+    bulletPosition.clear();
+}
 
 int main(int argc, char* argv[])
 {
@@ -357,38 +715,7 @@ int main(int argc, char* argv[])
     //
     LoadShadersFromFiles();
 
-    // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
-    LoadTextureImage("../../data/wallTexture.jpg");
-    LoadTextureImage("../../data/Crate1.jpg");
-    LoadTextureImage("../../data/Barrel_cover_texture.jpg");
 
-    // Construímos a representação de objetos geométricos através de malhas de triângulos
-    ObjModel spheremodel("../../data/sphere.obj");
-    ComputeNormals(&spheremodel);
-    BuildTrianglesAndAddToVirtualScene(&spheremodel);
-
-
-    ObjModel bunnymodel("../../data/bunny.obj");
-    ComputeNormals(&bunnymodel);
-    BuildTrianglesAndAddToVirtualScene(&bunnymodel);
-
-    ObjModel planemodel("../../data/plane.obj");
-    ComputeNormals(&planemodel);
-    BuildTrianglesAndAddToVirtualScene(&planemodel);
-
-    ObjModel wallmodel("../../data/wall.obj");
-    ComputeNormals(&wallmodel);
-    BuildTrianglesAndAddToVirtualScene(&wallmodel);
-
-    ObjModel crateModel("../../data/Crate1.obj");
-    ComputeNormals(&crateModel);
-    BuildTrianglesAndAddToVirtualScene(&crateModel);
-
-    ObjModel barrelModel("../../data/barrel.obj");
-    ComputeNormals(&barrelModel);
-    BuildTrianglesAndAddToVirtualScene(&barrelModel);
 
     if ( argc > 1 )
     {
@@ -396,17 +723,29 @@ int main(int argc, char* argv[])
         BuildTrianglesAndAddToVirtualScene(&model);
     }
 
+     LoadAllTextures();
+    LoadAllObjFiles();
+
     // Inicializamos o código para renderização de texto.
     TextRendering_Init();
 
     // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
     glEnable(GL_DEPTH_TEST);
-
-    // Habilitamos o Backface Culling. Veja slides 23-34 do documento Aula_13_Clipping_and_Culling.pdf.
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+    float previous_time = (float)glfwGetTime();
+    float current_time = (float)glfwGetTime();
+    delta_t = current_time - previous_time;
+    previous_time = current_time;
+
+    float destroyTime = (float)glfwGetTime();
+
+    //Centraliza e esconde o cursor
+    glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);  
+
+    float first_time = (float)glfwGetTime();
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -443,10 +782,8 @@ int main(int argc, char* argv[])
         g_CameraTheta2 -= 3.141592f/2;
         float z2 = r*cos(g_CameraPhi)*cos(g_CameraTheta2);
         float x2 = r*cos(g_CameraPhi)*sin(g_CameraTheta2);
-
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::vec4 camera_position_c  = glm::vec4(g_CameraX,g_CameraY,g_CameraZ,1.0f); // Ponto "c", centro da câmera
+        
+        camera_position_c  = g_NewPlayerPosition; // Ponto "c", centro da câmera
 
         //glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
         //glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
@@ -457,6 +794,39 @@ int main(int argc, char* argv[])
         glm::vec4 camera_forward_vetor = camera_view_vector;
         glm::vec4 camera_left_vetor = glm::vec4(x2, y, z2, 0.0f);
 
+        DrawLevel2();
+        MovePlayer(camera_view_vector, camera_up_vector, delta_t);
+         std::map<std::string, bool> collisions = CheckCollision();
+        if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
+            g_NewPlayerPosition = glm::vec4(g_NewPlayerPosition.x, g_NewPlayerPosition.y-(delta_t*cameraSpeed*3), g_NewPlayerPosition.z, g_NewPlayerPosition.w);
+        }
+        g_HitBoxes.clear();
+        camera_position_c = g_NewPlayerPosition;
+
+
+        if(current_time - first_time > 3){
+            std::cout << "spawn bullet" << std::endl;
+            glm::vec3 spawnVec = glm::vec3(camera_position_c.x -turrentPosition.x , camera_position_c.y -turrentPosition.y,camera_position_c.z - turrentPosition.z); 
+            spawnBullet(turrentPosition,spawnVec);
+
+            glm::vec3 spawnVec2 = glm::vec3(camera_position_c.x -turrentPosition2.x , camera_position_c.y -turrentPosition2.y,camera_position_c.z - turrentPosition2.z); 
+            spawnBullet(turrentPosition2,spawnVec2);
+
+            glm::vec3 spawnVec3 = glm::vec3(camera_position_c.x -turrentPosition3.x , camera_position_c.y -turrentPosition3.y,camera_position_c.z - turrentPosition3.z); 
+            spawnBullet(turrentPosition3,spawnVec3);
+            first_time = current_time; 
+        }
+
+        MoveBullet();
+        if(CheckBulletCollision()){
+            std::cout << "DIED" << std::endl;
+            diedRoutine();
+        }
+        current_time = glfwGetTime();
+        delta_t = current_time - previous_time;
+        previous_time = current_time;
+        g_CurrentTime = glfwGetTime();
+        /*
         // Variáveis estáticas (static) mantém seus valores entre chamadas
         // subsequentes da função!
         static float old_seconds = (float)glfwGetTime();
@@ -464,8 +834,8 @@ int main(int argc, char* argv[])
         // Recuperamos o número de segundos que passou desde a execução do programa
         float seconds = (float)glfwGetTime();
         float ellapsed_seconds = seconds - old_seconds;
-        old_seconds = seconds;
-
+        old_seconds = seconds;*/
+/*
         if (isMovingLeft) {
             g_CameraX -= camera_left_vetor.x * ellapsed_seconds;
             g_CameraZ -= camera_left_vetor.z * ellapsed_seconds;
@@ -484,7 +854,7 @@ int main(int argc, char* argv[])
             g_CameraY += camera_forward_vetor.y * ellapsed_seconds;
             g_CameraZ += camera_forward_vetor.z * ellapsed_seconds;
         }
-
+*/
 
         // Computamos a matriz "View" utilizando os parâmetros da câmera para
         // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
@@ -505,6 +875,8 @@ int main(int argc, char* argv[])
 
         glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
+
+
         // Enviamos as matrizes "view" e "projection" para a placa de vídeo
         // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
         // efetivamente aplicadas em todos os pontos.
@@ -513,82 +885,6 @@ int main(int argc, char* argv[])
 
         glUniform4f(camera_view_uniform,camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0f);
 
-      
-
-        // Desenhamos o plano do chão
-        model = Matrix_Translate(-5.0f,-2.5f,2.5f)
-                *Matrix_Scale(10.0f,1.0f,30.0f);
-
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-
-        // Desenhamos o plano parede de cima
-        model = Matrix_Translate(-5.0f,7.5f,2.5f)
-                *Matrix_Scale(10.0f,1.0f,30.0f)
-                *Matrix_Rotate_Z(PI);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-
-         // Desenhamos o plano parede da frente
-        model = Matrix_Translate(-5.0f,2.5f,32.5f)
-                *Matrix_Scale(10.0f,5.0f,1.0f)
-                *Matrix_Rotate_X(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-
-        // Desenhamos o plano parede de tras
-        model = Matrix_Translate(-5.0f,2.5f,-27.5f)
-                *Matrix_Scale(10.0f,5.0f,1.0f)
-                *Matrix_Rotate_X(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-        // Desenhamos o plano do parede esquerda
-        model = Matrix_Translate(5.0f,2.5f,2.5f)
-                *Matrix_Scale(1.0f,5.0f,30.0f)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-
-        //Parede Direita
-        model = Matrix_Translate(-15.0f,2.5f,2.5f)
-                *Matrix_Scale(1.0f,5.0f,30.0f)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-
-        //Barril
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-                *Matrix_Rotate_Z(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, BARREL);
-        DrawVirtualObject("barrel");
-
-        drawPlatform(1.0f,2.0f,0.4f,-1.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
-        drawPlatform(1.0f,2.0f,0.4f,3.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
-        drawStairs(0.8f,2.0f,0.4f,3.0f,-2.1f,-19.0f);
-        drawBoxHorizontalLine(3.0f,-1.5,-13.0f,3);
-        drawBoxStraightLine(-5.0f,-1.5,-26.5f,6);
-        drawBox(-2.9f,-1.5f,-15.0f);
-        drawPlatform(1.0f,2.0f,1.5f,0.0f,-1.0f,-9.0f);
-        drawPlatform(2.0f,2.0f,1.5f,0.0f,-1.0f,-5.0f);
-        drawBox(-1.0f,1.5f,-4.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,-5.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,0.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-10.6f,-1.0f,0.0f);
-
-        drawPlatform(1.0f,1.5f,0.4f,-10.5f,3.2f,6.6f); 
-        drawStairs(0.8f,1.5f,0.4f,-10.5f,0.8f,0.0f);
-        drawBox(-8.3f,-1.5f,-3.0f);
-        drawBox(-13.8f,-1.5f,-3.0f);
-        drawBox(-13.5f,0.5f,-3.3f);
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
         TextRendering_ShowEulerAngles(window);
@@ -669,6 +965,8 @@ void LoadTextureImage(const char* filename)
     glActiveTexture(GL_TEXTURE0 + textureunit);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glGenerateMipmap(GL_TEXTURE_2D);
     glBindSampler(textureunit, sampler_id);
 
@@ -756,12 +1054,9 @@ void LoadShadersFromFiles()
 
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(program_id);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage3"), 3);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage4"), 4);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage5"), 5);
+    glUniform1i(glGetUniformLocation(program_id, "PlatformTexture"), PLATFORM);
+    glUniform1i(glGetUniformLocation(program_id, "KeyTexture"), KEY);
+    glUniform1i(glGetUniformLocation(program_id, "CannonTexture"), CANNON);
     glUseProgram(0);
 }
 
@@ -1230,15 +1525,15 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // parâmetros que definem a posição da câmera dentro da cena virtual.
     // Assim, temos que o usuário consegue controlar a câmera.
 
-    if (g_LeftMouseButtonPressed)
-    {
+   // if (g_LeftMouseButtonPressed)
+    //{
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
     
         // Atualizamos parâmetros da câmera com os deslocamentos
-        g_CameraTheta -= 0.01f*dx;
-        g_CameraPhi   += 0.01f*dy;
+        g_CameraTheta -= 0.008f*dx;
+        g_CameraPhi   += 0.008f*dy;
     
         // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
         float phimax = 3.141592f/2;
@@ -1254,7 +1549,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
         g_LastCursorPosY = ypos;
-    }
+   // }
 
     if (g_RightMouseButtonPressed)
     {
@@ -1376,8 +1671,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         if (action == GLFW_PRESS) {
             std::cout << "pressing w" << std::endl;
             isMovingForward = true;
+            g_WPressed = true;
         } else if (action == GLFW_RELEASE) {
             isMovingForward = false;
+            g_WPressed = false;
         }
     }
 
@@ -1385,8 +1682,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_A) {
         if (action == GLFW_PRESS) {
             isMovingLeft = true;
+            g_APressed = true;
         } else if (action == GLFW_RELEASE) {
             isMovingLeft = false;
+            g_APressed = false;
         }
     }
 
@@ -1394,8 +1693,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_S) {
         if (action == GLFW_PRESS) {
             isMovingBackward = true;
+            g_SPressed = true;
         } else if (action == GLFW_RELEASE) {
             isMovingBackward = false;
+            g_SPressed = false;
         }
     }
 
@@ -1403,9 +1704,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_D) {
         if (action == GLFW_PRESS) {
             isMovingRight = true;
+            g_DPressed = true;
         } else if (action == GLFW_RELEASE) {
             isMovingRight = false;
+            g_DPressed = false;
         }
+    }
+
+     // Pressionar a barra de espaço faz o jogador pular
+    if (key == GLFW_KEY_SPACE && g_CurrentTime - g_LastTimeJumped > 0.5 && touchedGround) {
+        g_LastTimeJumped = (float)glfwGetTime();
+        g_SpacebarPressed = true;
+    } else {
+        g_SpacebarPressed = false;
     }
 }
 
