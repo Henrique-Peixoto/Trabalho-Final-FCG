@@ -39,6 +39,12 @@
 #define PLATFORM 0
 #define PLAYER 1
 #define KEY 2
+#define SPHERE 3
+#define BUNNY  4
+#define PLANE  5
+#define WALL 6
+#define CRATE 7
+#define BARREL 8
 float PI = 3.14159265359f;
 
 struct ObjModel {
@@ -81,12 +87,11 @@ glm::mat4 PlatformBaseModel();
 glm::mat4 PlayerBaseModel();
 void ApplyPlataformTransformation();
 void Draw(const char* objectName, glm::mat4 model, int objectNumber);
+void DrawLevel1();
 void DrawLevel2();
 void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t);
 
 // ! Possível retirada de funções
-
-Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
@@ -152,13 +157,12 @@ std::stack<glm::mat4>  g_MatrixStack;
 float g_ScreenRatio = 1.0f;
 
 // Ângulos de Euler que controlam a rotação de um dos cubos da cena virtual
-float g_AngleX = 0.0f;
-float g_AngleY = 0.0f;
-float g_AngleZ = 0.0f;
+// float g_AngleX = 0.0f;
+// float g_AngleY = 0.0f;
+// float g_AngleZ = 0.0f;
 
 // "g_LeftMouseButtonPressed = true" se o usuário está com o botão esquerdo do mouse
 // pressionado no momento atual. Veja função MouseButtonCallback().
-bool g_LeftMouseButtonPressed = false;
 bool g_RightMouseButtonPressed = false; // Análogo para botão direito do mouse
 bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mouse
 
@@ -166,9 +170,9 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // usuário através do mouse (veja função CursorPosCallback()). A posição
 // efetiva da câmera é calculada dentro da função main(), dentro do loop de
 // renderização.
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.5f; // Distância da câmera para a origem
+// float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
+// float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
+// float g_CameraDistance = 3.5f; // Distância da câmera para a origem
 float g_CameraX = 0.0f;
 float g_CameraY = 0.0f;
 float g_CameraZ = -20.0f;
@@ -246,12 +250,6 @@ void buildBezierCurveDegree2();
 void buildBezierCurveDegree3();
 std::map<std::string, float> retrieveBezierCurvePoint(std::string curveName);
 std::map<std::string, std::map<std::string, std::array<float, 200>>> g_BezierCurves;
-  #define SPHERE 0
-        #define BUNNY  1
-        #define PLANE  2
-        #define WALL 3
-        #define CRATE 4
-        #define BARREL 5
 
 void drawPlatform(float length, float width,float height, float x, float y, float z){
 
@@ -450,7 +448,7 @@ int main(int argc, char* argv[])
     }
 
     // Inicializamos o código para renderização de texto.
-    TextRendering_Init();
+    // TextRendering_Init();
 
     // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
     glEnable(GL_DEPTH_TEST);
@@ -483,6 +481,11 @@ int main(int argc, char* argv[])
 
     initializeBezierCurves();
 
+    float r = g_CameraDistance;
+    float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+    float y = r*sin(g_CameraPhi);
+    float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+
     while (!glfwWindowShouldClose(window)) {
         // Inicialização
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -495,59 +498,62 @@ int main(int argc, char* argv[])
 
         glBindVertexArray(vertex_array_object_id);
 
-        float r = g_CameraDistance;
-        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
-        float y = r*sin(g_CameraPhi);
-        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+        // ! possível retirada de código
+        // float r = g_CameraDistance;
+        // float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        // float y = r*sin(g_CameraPhi);
+        // float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+        // ! fim possível retirada de código
 
-        glm::vec4 camera_position_c = glm::vec4(x+g_PlayerPosition.x, y+g_PlayerPosition.y, z+g_PlayerPosition.z, 1.0f);
-        glm::vec4 camera_lookat_l = g_PlayerPosition;
-        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
-        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        // ? Fase 1
+        // glm::vec4 camera_position_c = glm::vec4(x+g_PlayerPosition.x, y+g_PlayerPosition.y, z+g_PlayerPosition.z, 1.0f);
+        // glm::vec4 camera_lookat_l = g_PlayerPosition;
+        // glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+        // glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 
-        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-        glUniformMatrix4fv(view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+        // glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        // glUniformMatrix4fv(view_uniform, 1, GL_FALSE, glm::value_ptr(view));
 
         // vvvvvvvv Cálculos relacionados à matriz "projection" vvvvvvvv
-        glm::mat4 projection;
+        // glm::mat4 projection;
         // O bloco deve se mover como uma câmera livre ao pressionar as teclas
         // WASD. Quando o mouse for movido, deve ser aplicada uma câmera look-at com o bloco (personagem) centralizado.
 
-        glm::mat4 model = Matrix_Identity()
-                * Matrix_Translate(
-                    g_PlayerPosition.x,
-                    g_PlayerPosition.y,
-                    g_PlayerPosition.z
-                )
-                * Matrix_Rotate_Y(g_CameraTheta) * Matrix_Rotate_Y(3.1415);
-        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
-        glUniform1i(object_id_uniform, PLAYER);
-        DrawVirtualObject("player");
+        // glm::mat4 model = Matrix_Identity()
+        //         * Matrix_Translate(
+        //             g_PlayerPosition.x,
+        //             g_PlayerPosition.y,
+        //             g_PlayerPosition.z
+        //         )
+        //         * Matrix_Rotate_Y(g_CameraTheta) * Matrix_Rotate_Y(3.1415);
+        // glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, PLAYER);
+        // DrawVirtualObject("player");
 
-        float nearplane = -0.1f;
-        float farplane = -50.0f;
+        // float nearplane = -0.1f;
+        // float farplane = -50.0f;
 
-        float fieldOfView = 3.141592 / 3.0f;
-        projection = Matrix_Perspective(fieldOfView, g_ScreenRatio, nearplane, farplane);
-        glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, glm::value_ptr(projection));
+        // float fieldOfView = 3.141592 / 3.0f;
+        // projection = Matrix_Perspective(fieldOfView, g_ScreenRatio, nearplane, farplane);
+        // glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, glm::value_ptr(projection));
         // ^^^^^^^^^ Cálculos relacionados à matriz "projection" ^^^^^^^^^
-
-        
-        DrawLevel2();
-        MovePlayer(camera_view_vector, camera_up_vector, delta_t);
-        std::map<std::string, bool> collisions = CheckCollision();
-        if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
-            g_NewPlayerPosition = glm::vec4(g_NewPlayerPosition.x, g_NewPlayerPosition.y-(delta_t*cameraSpeed*3), g_NewPlayerPosition.z, g_NewPlayerPosition.w);
-        }
-        g_HitBoxes.clear();
-        g_PlayerPosition = g_NewPlayerPosition;
+      
+        // DrawLevel2();
+        // MovePlayer(camera_view_vector, camera_up_vector, delta_t);
+        // std::map<std::string, bool> collisions = CheckCollision();
+        // if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
+        //     g_NewPlayerPosition = glm::vec4(g_NewPlayerPosition.x, g_NewPlayerPosition.y-(delta_t*cameraSpeed*3), g_NewPlayerPosition.z, g_NewPlayerPosition.w);
+        // }
+        // g_HitBoxes.clear();
+        // g_PlayerPosition = g_NewPlayerPosition;
 
         glBindVertexArray(0);
 
-        current_time = glfwGetTime();
-        delta_t = current_time - previous_time;
-        previous_time = current_time;
-        g_CurrentTime = glfwGetTime();
+        // current_time = glfwGetTime();
+        // delta_t = current_time - previous_time;
+        // previous_time = current_time;
+        // g_CurrentTime = glfwGetTime();
+        // ? fim Fase 1
 
 
         // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
@@ -579,7 +585,7 @@ int main(int argc, char* argv[])
         //glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
         glm::vec4 camera_view_vector = glm::vec4(x,y,z,0.0f);
         glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-
+        // TODO: separar câmera livre de câmera look-at. Da pra ser um if dentro dentro do LOOP ou função que regula a atualização da câmera
 
         glm::vec4 camera_forward_vetor = camera_view_vector;
         glm::vec4 camera_left_vetor = glm::vec4(x2, y, z2, 0.0f);
@@ -630,7 +636,7 @@ int main(int argc, char* argv[])
 
         
 
-        glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
+        // glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
         // Enviamos as matrizes "view" e "projection" para a placa de vídeo
         // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
@@ -641,94 +647,96 @@ int main(int argc, char* argv[])
         glUniform4f(camera_view_uniform,camera_view_vector.x,camera_view_vector.y,camera_view_vector.z,0.0f);
 
       
-
+        // * código movido para dentro da função DrawLevel1
         // Desenhamos o plano do chão
-        model = Matrix_Translate(-5.0f,-2.5f,2.5f)
-                *Matrix_Scale(10.0f,1.0f,30.0f);
+        // model = Matrix_Translate(-5.0f,-2.5f,2.5f)
+        //         *Matrix_Scale(10.0f,1.0f,30.0f);
 
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
 
-        // Desenhamos o plano parede de cima
-        model = Matrix_Translate(-5.0f,7.5f,2.5f)
-                *Matrix_Scale(10.0f,1.0f,30.0f)
-                *Matrix_Rotate_Z(PI);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+        // // Desenhamos o plano parede de cima
+        // model = Matrix_Translate(-5.0f,7.5f,2.5f)
+        //         *Matrix_Scale(10.0f,1.0f,30.0f)
+        //         *Matrix_Rotate_Z(PI);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
 
-         // Desenhamos o plano parede da frente
-        model = Matrix_Translate(-5.0f,2.5f,32.5f)
-                *Matrix_Scale(10.0f,5.0f,1.0f)
-                *Matrix_Rotate_X(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+        //  // Desenhamos o plano parede da frente
+        // model = Matrix_Translate(-5.0f,2.5f,32.5f)
+        //         *Matrix_Scale(10.0f,5.0f,1.0f)
+        //         *Matrix_Rotate_X(-PI/2);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
 
-        // Desenhamos o plano parede de tras
-        model = Matrix_Translate(-5.0f,2.5f,-27.5f)
-                *Matrix_Scale(10.0f,5.0f,1.0f)
-                *Matrix_Rotate_X(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
-        // Desenhamos o plano do parede esquerda
-        model = Matrix_Translate(5.0f,2.5f,2.5f)
-                *Matrix_Scale(1.0f,5.0f,30.0f)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+        // // Desenhamos o plano parede de tras
+        // model = Matrix_Translate(-5.0f,2.5f,-27.5f)
+        //         *Matrix_Scale(10.0f,5.0f,1.0f)
+        //         *Matrix_Rotate_X(PI/2);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
+        // // Desenhamos o plano do parede esquerda
+        // model = Matrix_Translate(5.0f,2.5f,2.5f)
+        //         *Matrix_Scale(1.0f,5.0f,30.0f)
+        //         *Matrix_Rotate_X(PI/2)
+        //         *Matrix_Rotate_Z(PI/2);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
 
-        //Parede Direita
-        model = Matrix_Translate(-15.0f,2.5f,2.5f)
-                *Matrix_Scale(1.0f,5.0f,30.0f)
-                *Matrix_Rotate_X(PI/2)
-                *Matrix_Rotate_Z(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+        // //Parede Direita
+        // model = Matrix_Translate(-15.0f,2.5f,2.5f)
+        //         *Matrix_Scale(1.0f,5.0f,30.0f)
+        //         *Matrix_Rotate_X(PI/2)
+        //         *Matrix_Rotate_Z(-PI/2);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, WALL);
+        // DrawVirtualObject("wall");
 
-        //Barril
-        model = Matrix_Translate(1.0f,0.0f,0.0f)
-                *Matrix_Rotate_Z(-PI/2);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, BARREL);
-        DrawVirtualObject("barrel");
+        // //Barril
+        // model = Matrix_Translate(1.0f,0.0f,0.0f)
+        //         *Matrix_Rotate_Z(-PI/2);
+        // glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        // glUniform1i(object_id_uniform, BARREL);
+        // DrawVirtualObject("barrel");
 
-        drawPlatform(1.0f,2.0f,0.4f,-1.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
-        drawPlatform(1.0f,2.0f,0.4f,3.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
-        drawStairs(0.8f,2.0f,0.4f,3.0f,-2.1f,-19.0f);
-        drawBoxHorizontalLine(3.0f,-1.5,-13.0f,3);
-        drawBoxStraightLine(-5.0f,-1.5,-26.5f,6);
-        drawBox(-2.9f,-1.5f,-15.0f);
-        drawPlatform(1.0f,2.0f,1.5f,0.0f,-1.0f,-9.0f);
-        drawPlatform(2.0f,2.0f,1.5f,0.0f,-1.0f,-5.0f);
-        drawBox(-1.0f,1.5f,-4.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,-5.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,0.0f);
-        drawPlatform(2.0f,2.0f,1.5f,-10.6f,-1.0f,0.0f);
+        // drawPlatform(1.0f,2.0f,0.4f,-1.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
+        // drawPlatform(1.0f,2.0f,0.4f,3.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
+        // drawStairs(0.8f,2.0f,0.4f,3.0f,-2.1f,-19.0f);
+        // drawBoxHorizontalLine(3.0f,-1.5,-13.0f,3);
+        // drawBoxStraightLine(-5.0f,-1.5,-26.5f,6);
+        // drawBox(-2.9f,-1.5f,-15.0f);
+        // drawPlatform(1.0f,2.0f,1.5f,0.0f,-1.0f,-9.0f);
+        // drawPlatform(2.0f,2.0f,1.5f,0.0f,-1.0f,-5.0f);
+        // drawBox(-1.0f,1.5f,-4.0f);
+        // drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,-5.0f);
+        // drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,0.0f);
+        // drawPlatform(2.0f,2.0f,1.5f,-10.6f,-1.0f,0.0f);
 
-        drawPlatform(1.0f,1.5f,0.4f,-10.5f,3.2f,6.6f); 
-        drawStairs(0.8f,1.5f,0.4f,-10.5f,0.8f,0.0f);
-        drawBox(-8.3f,-1.5f,-3.0f);
-        drawBox(-13.8f,-1.5f,-3.0f);
-        drawBox(-13.5f,0.5f,-3.3f);
+        // drawPlatform(1.0f,1.5f,0.4f,-10.5f,3.2f,6.6f); 
+        // drawStairs(0.8f,1.5f,0.4f,-10.5f,0.8f,0.0f);
+        // drawBox(-8.3f,-1.5f,-3.0f);
+        // drawBox(-13.8f,-1.5f,-3.0f);
+        // drawBox(-13.5f,0.5f,-3.3f);
+        // * fim código movido para dentro da função DrawLevel1
+
         // Imprimimos na tela os ângulos de Euler que controlam a rotação do
         // terceiro cubo.
-        TextRendering_ShowEulerAngles(window);
+        // TextRendering_ShowEulerAngles(window);
 
 
         // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
-        TextRendering_ShowProjection(window);
+        // TextRendering_ShowProjection(window);
 
         // Imprimimos na tela informação sobre o número de quadros renderizados
         // por segundo (frames per second).
-        TextRendering_ShowFramesPerSecond(window);
+        // TextRendering_ShowFramesPerSecond(window);
 
-        TextRendering_ShowModelViewProjection(window, projection, view, model, camera_position_c);
+        // TextRendering_ShowModelViewProjection(window, projection, view, model, camera_position_c);
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -1013,7 +1021,86 @@ void Draw(const char* objectName, glm::mat4 model, int objectNumber) {
 }
 
 void DrawLevel2() {
+    // TODO: trazer o código da função chamada abaixo aqui para dentro
     ApplyPlataformTransformation();
+}
+
+void DrawLevel1() {
+    glm::mat4 model = Matrix_Identity();
+
+    model = Matrix_Translate(-5.0f,-2.5f,2.5f)
+            *Matrix_Scale(10.0f,1.0f,30.0f);
+
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+
+    // Desenhamos o plano parede de cima
+    model = Matrix_Translate(-5.0f,7.5f,2.5f)
+            *Matrix_Scale(10.0f,1.0f,30.0f)
+            *Matrix_Rotate_Z(PI);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+
+        // Desenhamos o plano parede da frente
+    model = Matrix_Translate(-5.0f,2.5f,32.5f)
+            *Matrix_Scale(10.0f,5.0f,1.0f)
+            *Matrix_Rotate_X(-PI/2);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+
+    // Desenhamos o plano parede de tras
+    model = Matrix_Translate(-5.0f,2.5f,-27.5f)
+            *Matrix_Scale(10.0f,5.0f,1.0f)
+            *Matrix_Rotate_X(PI/2);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+    // Desenhamos o plano do parede esquerda
+    model = Matrix_Translate(5.0f,2.5f,2.5f)
+            *Matrix_Scale(1.0f,5.0f,30.0f)
+            *Matrix_Rotate_X(PI/2)
+            *Matrix_Rotate_Z(PI/2);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+
+    //Parede Direita
+    model = Matrix_Translate(-15.0f,2.5f,2.5f)
+            *Matrix_Scale(1.0f,5.0f,30.0f)
+            *Matrix_Rotate_X(PI/2)
+            *Matrix_Rotate_Z(-PI/2);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, WALL);
+    DrawVirtualObject("wall");
+
+    //Barril
+    model = Matrix_Translate(1.0f,0.0f,0.0f)
+            *Matrix_Rotate_Z(-PI/2);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, BARREL);
+    DrawVirtualObject("barrel");
+
+    drawPlatform(1.0f,2.0f,0.4f,-1.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
+    drawPlatform(1.0f,2.0f,0.4f,3.0f,0.3f,-12.4f); // ZDif = +6.6 YDif = +2.4
+    drawStairs(0.8f,2.0f,0.4f,3.0f,-2.1f,-19.0f);
+    drawBoxHorizontalLine(3.0f,-1.5,-13.0f,3);
+    drawBoxStraightLine(-5.0f,-1.5,-26.5f,6);
+    drawBox(-2.9f,-1.5f,-15.0f);
+    drawPlatform(1.0f,2.0f,1.5f,0.0f,-1.0f,-9.0f);
+    drawPlatform(2.0f,2.0f,1.5f,0.0f,-1.0f,-5.0f);
+    drawBox(-1.0f,1.5f,-4.0f);
+    drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,-5.0f);
+    drawPlatform(2.0f,2.0f,1.5f,-5.3f,-1.0f,0.0f);
+    drawPlatform(2.0f,2.0f,1.5f,-10.6f,-1.0f,0.0f);
+
+    drawPlatform(1.0f,1.5f,0.4f,-10.5f,3.2f,6.6f); 
+    drawStairs(0.8f,1.5f,0.4f,-10.5f,0.8f,0.0f);
+    drawBox(-8.3f,-1.5f,-3.0f);
+    drawBox(-13.8f,-1.5f,-3.0f);
+    drawBox(-13.5f,0.5f,-3.3f);
 }
 
 std::map<std::string, float> retrieveBezierCurvePoint(std::string curveName) {
@@ -1174,56 +1261,58 @@ void buildBezierCurveDegree3() {
 }
 
 // Função que carrega uma imagem para ser utilizada como textura
-void LoadTextureImage(const char* filename)
-{
-    printf("Carregando imagem \"%s\"... ", filename);
+// ! possível retirada de código
+// void LoadTextureImage(const char* filename)
+// {
+//     printf("Carregando imagem \"%s\"... ", filename);
 
-    // Primeiro fazemos a leitura da imagem do disco
-    stbi_set_flip_vertically_on_load(true);
-    int width;
-    int height;
-    int channels;
-    unsigned char *data = stbi_load(filename, &width, &height, &channels, 3);
+//     // Primeiro fazemos a leitura da imagem do disco
+//     stbi_set_flip_vertically_on_load(true);
+//     int width;
+//     int height;
+//     int channels;
+//     unsigned char *data = stbi_load(filename, &width, &height, &channels, 3);
 
-    if ( data == NULL )
-    {
-        fprintf(stderr, "ERROR: Cannot open image file \"%s\".\n", filename);
-        std::exit(EXIT_FAILURE);
-    }
+//     if ( data == NULL )
+//     {
+//         fprintf(stderr, "ERROR: Cannot open image file \"%s\".\n", filename);
+//         std::exit(EXIT_FAILURE);
+//     }
 
-    printf("OK (%dx%d).\n", width, height);
+//     printf("OK (%dx%d).\n", width, height);
 
-    // Agora criamos objetos na GPU com OpenGL para armazenar a textura
-    GLuint texture_id;
-    GLuint sampler_id;
-    glGenTextures(1, &texture_id);
-    glGenSamplers(1, &sampler_id);
+//     // Agora criamos objetos na GPU com OpenGL para armazenar a textura
+//     GLuint texture_id;
+//     GLuint sampler_id;
+//     glGenTextures(1, &texture_id);
+//     glGenSamplers(1, &sampler_id);
 
-    // Veja slides 95-96 do documento Aula_20_Mapeamento_de_Texturas.pdf
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+//     // Veja slides 95-96 do documento Aula_20_Mapeamento_de_Texturas.pdf
+//     glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+//     glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    // Parâmetros de amostragem da textura.
-    glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//     // Parâmetros de amostragem da textura.
+//     glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+//     glSamplerParameteri(sampler_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // Agora enviamos a imagem lida do disco para a GPU
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-    glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+//     // Agora enviamos a imagem lida do disco para a GPU
+//     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+//     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+//     glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+//     glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
 
-    GLuint textureunit = g_NumLoadedTextures;
-    glActiveTexture(GL_TEXTURE0 + textureunit);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glBindSampler(textureunit, sampler_id);
+//     GLuint textureunit = g_NumLoadedTextures;
+//     glActiveTexture(GL_TEXTURE0 + textureunit);
+//     glBindTexture(GL_TEXTURE_2D, texture_id);
+//     glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+//     glGenerateMipmap(GL_TEXTURE_2D);
+//     glBindSampler(textureunit, sampler_id);
 
-    stbi_image_free(data);
+//     stbi_image_free(data);
 
-    g_NumLoadedTextures += 1;
-}
+//     g_NumLoadedTextures += 1;
+// }
+// ! fim possível retirada de código
 
 // Função que desenha um objeto armazenado em g_VirtualScene. Veja definição
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
@@ -1307,14 +1396,21 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(program_id, "PlatformTexture"), PLATFORM);
     glUniform1i(glGetUniformLocation(program_id, "PlayerTexture"), PLAYER);
     glUniform1i(glGetUniformLocation(program_id, "KeyTexture"), KEY);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
+    glUniform1i(glGetUniformLocation(program_id, "SphereTexture"), SPHERE);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
+    glUniform1i(glGetUniformLocation(program_id, "BunnyTexture"), BUNNY);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
+    glUniform1i(glGetUniformLocation(program_id, "PlaneTexture"), PLANE);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage3"), 3);
+    glUniform1i(glGetUniformLocation(program_id, "WallTexture"), WALL);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage4"), 4);
+    glUniform1i(glGetUniformLocation(program_id, "CrateTexture"), CRATE);
+    // glUniform1i(glGetUniformLocation(program_id, "TextureImage5"), 5);
+    glUniform1i(glGetUniformLocation(program_id, "BarrelTexture"), BARREL);
+
     
     // ! colocar identificadores para essas texturas
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage3"), 3);
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage4"), 4);
-    // glUniform1i(glGetUniformLocation(program_id, "TextureImage5"), 5);
     // ! fim colocar identificadores para essas texturas
     glUseProgram(0);
 }
@@ -1883,7 +1979,7 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height)
 // Variáveis globais que armazenam a última posição do cursor do mouse, para
 // que possamos calcular quanto que o mouse se movimentou entre dois instantes
 // de tempo. Utilizadas no callback CursorPosCallback() abaixo.
-double g_LastCursorPosX, g_LastCursorPosY;
+// double g_LastCursorPosX, g_LastCursorPosY;
 
 // Função callback chamada sempre que o usuário aperta algum dos botões do mouse
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)

@@ -27,28 +27,12 @@ out vec3 rasterized_color;
 out vec3 vertex_color;
 out vec2 texcoords;
 
-<<<<<<< HEAD
 void main() {
     // Para uso no Gouraud shading
     vec4 origin = vec4(0.0, 0.0, 0.0, 1.0);
     vec4 camera_position = inverse(view) * origin;
 
     gl_Position = projection * view * model * model_coefficients;
-=======
-void main()
-{
-    // A vari·vel gl_Position define a posiÁ„o final de cada vÈrtice
-    // OBRIGATORIAMENTE em "normalized device coordinates" (NDC), onde cada
-    // coeficiente estar· entre -1 e 1 apÛs divis„o por w.
-    // Veja slides 144 e 150 do documento "Aula_09_Projecoes.pdf".
-    //
-    // O cÛdigo em "main.cpp" define os vÈrtices dos modelos em coordenadas
-    // locais de cada modelo (array model_coefficients). Abaixo, utilizamos
-    // operaÁıes de modelagem, definiÁ„o da c‚mera, e projeÁ„o, para computar
-    // as coordenadas finais em NDC (vari·vel gl_Position). ApÛs a execuÁ„o
-    // deste Vertex Shader, a placa de vÌdeo (GPU) far· a divis„o por W. Veja
-    // slide 189 do documento "Aula_09_Projecoes.pdf".
->>>>>>> first
 
     gl_Position = projection * view * model * model_coefficients;
 
@@ -77,7 +61,6 @@ void main()
     normal = inverse(transpose(model)) * normal_coefficients;
     normal.w = 0.0;
 
-<<<<<<< HEAD
     vec4 n = normalize(normal);
     vec4 l = normalize(vec4(1.0,1.0,0.0,0.0));
     vec4 v = normalize(camera_position - position_world);
@@ -122,9 +105,6 @@ void main()
     
     vertex_color = color_coefficients + ambient_term + lambert_diffuse_term + specular_term;
 
-=======
-    // Coordenadas de textura obtidas do arquivo OBJ (se existirem!)
->>>>>>> first
     texcoords = texture_coefficients;
 
     rasterized_color = color_coefficients;
