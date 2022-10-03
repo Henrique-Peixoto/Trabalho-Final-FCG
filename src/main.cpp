@@ -642,6 +642,13 @@ void diedRoutine(){
     bulletPosition.clear();
 }
 
+bool fell(){
+    if(g_NewPlayerPosition.y < -1.0f){
+        return true;
+    }else
+        return false;
+}
+
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -818,7 +825,7 @@ int main(int argc, char* argv[])
         }
 
         MoveBullet();
-        if(CheckBulletCollision()){
+        if(CheckBulletCollision() || fell()){
             std::cout << "DIED" << std::endl;
             diedRoutine();
         }
