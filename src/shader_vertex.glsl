@@ -72,7 +72,7 @@ void main() {
     vec3 ambient_term = Ka*Ia;
 
     // Termo especular de Blinn-Phong
-    vec3 specular_term = Ks*I*pow(dot(n, h), qLine);
+    vec3 specular_term = Ks*I*pow(max(dot(n, h), 0), qLine);
     
     vertex_color = color_coefficients + ambient_term + lambert_diffuse_term + specular_term;
 

@@ -98,16 +98,16 @@ void main() {
     vec3 ambient_term = Ka*Ia;
 
     // Termo especular de Blinn-Phong
-    vec3 specular_term = Ks*I*pow(dot(n, h), qLine);
+    vec3 specular_term = Ks*I*pow(max(dot(n, h), 0), qLine);
 
     if (object_id == KEY) {
         // Aplicando o modelo de iluminação de Blinn-Phong no objeto da chave
         color.rgb = Kd0 + ambient_term + lambert_diffuse_term + specular_term + vertex_color;
     } else if (object_id != PLAYER) {
         // Aplicando o modelo de iluminação de Phong nos objetos da cena
-        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + vertex_color;
+        color.rgb = Kd0 + ambient_term + lambert_diffuse_term;
     } else {
-        color.rgb = vertex_color + Kd0;
+        color.rgb = vertex_color;
     }
 
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
