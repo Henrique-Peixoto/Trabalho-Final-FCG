@@ -15,6 +15,7 @@
 //  vira
 //    #include <cstdio> // Em C++
 //
+#include <bits/stdc++.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -86,7 +87,8 @@ void PopMatrix(glm::mat4& M);
 // logo após a definição de main() neste arquivo.
 void BuildTrianglesAndAddToVirtualScene(ObjModel*); // Constrói representação de um ObjModel como malha de triângulos para renderização
 void ComputeNormals(ObjModel* model); // Computa normais de um ObjModel, caso não existam.
-void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
+void LoadShadersFromFiles();
+void LoadShadersFromFilesLevel2();  // Carrega os shaders de vértice e fragmento, criando um programa de GPU
 void LoadTextureImage(const char* filename); // Função que carrega imagens de textura
 void DrawVirtualObject(const char* object_name); // Desenha um objeto armazenado em g_VirtualScene
 GLuint LoadShader_Vertex(const char* filename);   // Carrega um vertex shader
@@ -127,7 +129,7 @@ void LoadAllObjFiles();
 glm::mat4 PlatformBaseModel();
 void ApplyPlataformTransformation();
 void Draw(const char* objectName, glm::mat4 model, int objectNumber);
-void DrawLevel2();
+void DrawLevel1();
 void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t);
 
 // Funções relacionadas às texturas
@@ -261,6 +263,7 @@ std::map<std::string, bool> CheckCollision();
 bool CheckBulletCollision();
 void CalculateHitBox(std::string objName, float x, float y, float z, float scaleFactorX = 1.0, float scaleFactorY = 1.0, float scaleFactorZ = 1.0);
 std::vector<SceneObject> g_HitBoxes;
+std::vector<SceneObject> g_KeyHitBoxes;
 
 
 void LoadAllTextures() {
@@ -287,7 +290,23 @@ void LoadAllObjFiles() {
     BuildTrianglesAndAddToVirtualScene(&sphere);
 
 }
+void LoadAllTexturesLevel2(){
+    LoadTextureImage("../../data/level2-player-texture.jpg");
+}
+void LoadAllObjFilesLevel2() {
 
+    ObjModel player("../../data/player.obj");
+    ComputeNormals(&player);
+    BuildTrianglesAndAddToVirtualScene(&player);
+
+}
+void initializeBezierCurves();
+void buildBezierCurveXTranslation();
+void buildBezierCurveYTranslation();
+void buildBezierCurveDegree2();
+void buildBezierCurveDegree3();
+std::map<std::string, float> retrieveBezierCurvePoint(std::string curveName);
+std::map<std::string, std::map<std::string, std::array<float, 200>>> g_BezierCurves;
 
 glm::mat4 PlatformBaseModel() {
     glm::mat4 model = Matrix_Identity()
@@ -320,6 +339,8 @@ void CalculateHitBox(std::string objName, float x, float y, float z, float scale
         z+obj.bbox_max.z*scaleFactorZ
     );
 }
+
+bool changeLevel = false;
 
 float spherePositionX = 0.0f;
 
@@ -496,8 +517,8 @@ void ApplyPlataformTransformation() {
     model = PlatformBaseModel() * Matrix_Translate(-6.5f, 9.75f, 12.5f) * Matrix_Scale(0.5, 8, 0.5);
     Draw("platform", model, PLATFORM);
 
-    CalculateHitBox("key", -4.0f, 14.0f, 15.0f);
-    g_HitBoxes.push_back(g_VirtualScene["key"]);
+    CalculateHitBox("key", -4.0f, 9.75f, 15.0f);
+    g_KeyHitBoxes.push_back(g_VirtualScene["key"]);
     model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.75f, 15.0f) * Matrix_Rotate_Y(3.1415/2) * Matrix_Rotate_Z(3.1415/2) * Matrix_Scale(0.25, 0.25, 0.25);
     Draw("key", model, KEY);
 
@@ -533,7 +554,7 @@ void Draw(const char* objectName, glm::mat4 model, int objectNumber) {
     DrawVirtualObject(objectName);
 }
 
-void DrawLevel2() {
+void DrawLevel1() {
     ApplyPlataformTransformation();
 }
 
@@ -544,18 +565,352 @@ void MoveBullet(){
     }
 }
 
+bool trocou = false;
+bool invertAnimationDirection = false;
+void ApplyPlataformTransformationLevel2() {
+    CalculateHitBox("platform", 0.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    glm::mat4 model = PlatformBaseModel() * Matrix_Translate(0.0f, 2.0f, 0.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 2.0f, 0.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 2.0f, 0.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 2.0f, 0.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 2.0f, 4.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 2.0f, 4.0f);
+    Draw("platform", model, PLATFORM);
+
+    std::map<std::string, float> point = retrieveBezierCurvePoint("x_translate");
+    CalculateHitBox("platform", 8.0f+point["x"], 3.0f, 8.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f+point["x"], 3.0f, 8.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 3.0f, 12.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f, 12.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 3.0f, 14.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f, 14.0f) * Matrix_Rotate_Z(g_CurrentTime*2) * Matrix_Rotate_X(3.1415/2) * Matrix_Scale(0.5, 1, 2);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 3.0f, 16.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f, 16.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("y_translate");
+    CalculateHitBox("platform", 8.0f, 3.0f+point["y"], 20.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f+point["y"], 20.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("parable");
+    CalculateHitBox("platform", 8.0f+point["x"], 3.0f+point["y"], 24.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f+point["x"], 3.0f+point["y"], 24.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 8.0f, 3.0f, 28.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f, 28.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("cubic");
+    CalculateHitBox("platform", 8.0f, 3.0f+point["y"], 32.0f+point["x"]);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(8.0f, 3.0f+point["y"], 32.0f+point["x"]);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", 4.0f, 4.0f, 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(4.0f, 4.0f, 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("y_translate");
+    CalculateHitBox("platform", 0.0f, 5.0f+point["y"], 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(0.0f, 5.0f+point["y"], 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("y_translate");
+    CalculateHitBox("platform", -4.0f, 6.0f+point["y"], 32.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 6.0f+point["y"], 32.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("x_translate");
+    CalculateHitBox("platform", -4.0f+point["x"], 8.0f, 28.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f+point["x"], 8.0f, 28.0f);
+    Draw("platform", model, PLATFORM);
+
+    point = retrieveBezierCurvePoint("x_translate");
+    CalculateHitBox("platform", -4.0f, 8.0f+point["x"], 24.0f+point["x"]);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 8.0f+point["x"], 24.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 6.0f, 19.45f, 1.0, 1.0, 0.25);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 6.0f, 19.45f) * Matrix_Scale(1, 1, 0.25);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 6.5f, 18.95f, 1.0, 1.0, 0.25);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 6.5f, 18.95f) * Matrix_Scale(1, 1, 0.25);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 7.0f, 18.45f, 1.0, 1.0, 0.25);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 7.0f, 18.45f) * Matrix_Scale(1, 1, 0.25);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 7.5f, 15.0f, 3.2, 1.0, 3.2);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 7.5f, 15.0f) * Matrix_Scale(3.2, 1, 3.2);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 8.0f, 15.0f, 2.0, 1.0, 2.0);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 8.0f, 15.0f) * Matrix_Scale(2, 1, 2);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 8.5f, 15.0f, 1.5, 1.0, 1.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 8.5f, 15.0f) * Matrix_Scale(1.5, 1, 1.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 9.0f, 15.0f);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.0f, 15.0f);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -4.0f, 9.0f, 15.0f, 0.5, 2.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.0f, 15.0f) * Matrix_Scale(0.5, 2, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -1.5f, 9.75f, 17.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-1.5f, 9.75f, 17.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -6.5f, 9.75f, 17.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-6.5f, 9.75f, 17.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -1.5f, 9.75f, 12.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-1.5f, 9.75f, 12.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("platform", -6.5f, 9.75f, 12.5f, 0.5, 8.0, 0.5);
+    g_HitBoxes.push_back(g_VirtualScene["platform"]);
+    model = PlatformBaseModel() * Matrix_Translate(-6.5f, 9.75f, 12.5f) * Matrix_Scale(0.5, 8, 0.5);
+    Draw("platform", model, PLATFORM);
+
+    CalculateHitBox("key", -4.0f, 14.0f, 15.0f);
+    g_KeyHitBoxes.push_back(g_VirtualScene["key"]);
+    model = PlatformBaseModel() * Matrix_Translate(-4.0f, 9.75f, 15.0f) * Matrix_Rotate_Y(3.1415/2) * Matrix_Rotate_Z(3.1415/2) * Matrix_Scale(0.25, 0.25, 0.25);
+    Draw("key", model, KEY);
+}
+
+void DrawLevel2() {
+    ApplyPlataformTransformationLevel2();
+}
+
+std::map<std::string, float> retrieveBezierCurvePoint(std::string curveName) {
+    float auxTime = g_CurrentTime;
+    int remainder200 = (int)(g_CurrentTime*100)%200;
+
+    if (remainder200 >= 194 && !trocou) {
+        invertAnimationDirection = !invertAnimationDirection;
+        trocou = true;
+    }
+
+    if (remainder200 >= 194 && remainder200 <= 199) {
+        if (invertAnimationDirection) {
+            auxTime = 0;
+        } else {
+            auxTime = 0.01;
+        }
+    }
+
+    if (remainder200 < 194) trocou = false;
+
+    std::array<float, 200> curvePointsX = g_BezierCurves[curveName]["x"];
+    std::array<float, 200> curvePointsY = g_BezierCurves[curveName]["y"];
+
+    float currentX, currentY;
+    if (invertAnimationDirection) {
+        currentX = curvePointsX[199-(int)(auxTime*100)%200];
+        currentY = curvePointsY[199-(int)(auxTime*100)%200];
+    } else {
+        currentX = curvePointsX[(int)(auxTime*100)%200];
+        currentY = curvePointsY[(int)(auxTime*100)%200];
+    }
+
+    std::map<std::string, float> point;
+    point["x"] = currentX;
+    point["y"] = currentY;
+
+    return point;
+}
+
+void initializeBezierCurves() {
+    buildBezierCurveXTranslation();
+    buildBezierCurveYTranslation();
+    buildBezierCurveDegree2();
+    buildBezierCurveDegree3();
+}
+
+void buildBezierCurveXTranslation() {
+    float controlPointsX[2];
+    controlPointsX[0] = -2.0;
+    controlPointsX[1] = 2.0;
+
+    float controlPointsY[2];
+    controlPointsY[0] = 0.0;
+    controlPointsY[1] = 0.0;
+
+    std::array<float, 200> curvePointsX;
+    std::array<float, 200> curvePointsY;
+
+    int i = 0;
+    float t = 0;
+    for (i = 0, t = 0; t <= 1; i++, t += 0.005) {
+        curvePointsX[i] = controlPointsX[0] + t*(controlPointsX[1] - controlPointsX[0]);
+
+        curvePointsY[i] = controlPointsY[0] + t*(controlPointsY[1] - controlPointsY[0]);
+    }
+
+    g_BezierCurves["x_translate"]["x"] = curvePointsX;
+    g_BezierCurves["x_translate"]["y"] = curvePointsY;
+}
+
+void buildBezierCurveYTranslation() {
+    float controlPointsX[2];
+    controlPointsX[0] = 0.0;
+    controlPointsX[1] = 0.0;
+
+    float controlPointsY[2];
+    controlPointsY[0] = -2.0;
+    controlPointsY[1] = 2.0;
+
+    std::array<float, 200> curvePointsX;
+    std::array<float, 200> curvePointsY;
+
+    int i = 0;
+    float t = 0;
+    for (i = 0, t = 0; t <= 1; i++, t += 0.005) {
+        curvePointsX[i] = controlPointsX[0] + t*(controlPointsX[1] - controlPointsX[0]);
+
+        curvePointsY[i] = controlPointsY[0] + t*(controlPointsY[1] - controlPointsY[0]);
+    }
+
+    g_BezierCurves["y_translate"]["x"] = curvePointsX;
+    g_BezierCurves["y_translate"]["y"] = curvePointsY;
+}
+
+void buildBezierCurveDegree2() {
+    float controlPointsX[3];
+    controlPointsX[0] = -1.0;
+    controlPointsX[1] = 0.0;
+    controlPointsX[2] = 1.0;
+
+    float controlPointsY[3];
+    controlPointsY[0] = -1.0;
+    controlPointsY[1] = 1.0;
+    controlPointsY[2] = -1.0;
+
+    std::array<float, 200> curvePointsX;
+    std::array<float, 200> curvePointsY;
+
+    int i = 0;
+    float t = 0;
+    for (i = 0, t = 0; t <= 1; i++, t += 0.005) {
+        curvePointsX[i] = (1-t)*(1-t)*controlPointsX[0]
+                        + 2*t*(1-t)*controlPointsX[1]
+                        + t*t*controlPointsX[2];
+
+        curvePointsY[i] = (1-t)*(1-t)*controlPointsY[0]
+                        + 2*t*(1-t)*controlPointsY[1]
+                        + t*t*controlPointsY[2];
+    }
+
+    g_BezierCurves["parable"]["x"] = curvePointsX;
+    g_BezierCurves["parable"]["y"] = curvePointsY;
+}
+
+void buildBezierCurveDegree3() {
+    float controlPointsX[4];
+    controlPointsX[0] = 0.0;
+    controlPointsX[1] = -3.0;
+    controlPointsX[2] = 3.0;
+    controlPointsX[3] = 0.0;
+
+    float controlPointsY[4];
+    controlPointsY[0] = 0.0;
+    controlPointsY[1] = 3.0;
+    controlPointsY[2] = 3.0;
+    controlPointsY[3] = 0.0;
+
+    std::array<float, 200> curvePointsX;
+    std::array<float, 200> curvePointsY;
+
+    int i = 0;
+    float t = 0;
+    for (i = 0, t = 0; t <= 1; i++, t += 0.005) {
+        curvePointsX[i] = (1-t)*(1-t)*(1-t)*controlPointsX[0]
+                        + 3*t*t*(1-t)*controlPointsX[1]
+                        + 3*t*(1-t)*(1-t)*controlPointsX[2]
+                        + t*t*t*controlPointsX[3];
+
+        curvePointsY[i] = (1-t)*(1-t)*(1-t)*controlPointsY[0]
+                        + 3*t*t*(1-t)*controlPointsY[1]
+                        + 3*t*(1-t)*(1-t)*controlPointsY[2]
+                        + t*t*t*controlPointsY[3];
+    }
+
+    g_BezierCurves["cubic"]["x"] = curvePointsX;
+    g_BezierCurves["cubic"]["y"] = curvePointsY;
+}
+
+
 void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float delta_t) {
         glm::vec4 camera_view_vector_n = normalize(camera_view_vector);
         camera_view_vector_n = glm::vec4(camera_view_vector_n.x*3, camera_view_vector_n.y*3, camera_view_vector_n.z*3, camera_view_vector_n.w);
         glm::vec4 wsMoveDirection = glm::vec4(camera_view_vector_n.x, 0.0f, camera_view_vector_n.z, 0.0f);
-        if (g_WPressed) g_NewPlayerPosition = camera_position_c + wsMoveDirection * cameraSpeed * delta_t;
-        if (g_SPressed) g_NewPlayerPosition = camera_position_c - wsMoveDirection * cameraSpeed * delta_t;
+        if(!changeLevel){
+            if (g_WPressed) g_NewPlayerPosition = camera_position_c + wsMoveDirection * cameraSpeed * delta_t;
+            if (g_SPressed) g_NewPlayerPosition = camera_position_c - wsMoveDirection * cameraSpeed * delta_t;
+        }else{
+            if (g_WPressed) g_NewPlayerPosition = g_PlayerPosition + wsMoveDirection * cameraSpeed * delta_t;
+            if (g_SPressed) g_NewPlayerPosition = g_PlayerPosition - wsMoveDirection * cameraSpeed * delta_t;
 
+        }
         glm::vec4 sideVector = crossproduct(camera_view_vector_n, camera_up_vector);
         glm::vec4 adMoveDirection = glm::vec4(sideVector.x, 0.0f, sideVector.z, 0.0f);
-        if (g_APressed) g_NewPlayerPosition = camera_position_c - adMoveDirection * cameraSpeed * delta_t;
-        if (g_DPressed) g_NewPlayerPosition = camera_position_c + adMoveDirection * cameraSpeed * delta_t;
+        if(!changeLevel){
+            if (g_APressed) g_NewPlayerPosition = camera_position_c - adMoveDirection * cameraSpeed * delta_t;
+            if (g_DPressed) g_NewPlayerPosition = camera_position_c + adMoveDirection * cameraSpeed * delta_t;
+        }else{
+             if (g_APressed) g_NewPlayerPosition = g_PlayerPosition - adMoveDirection * cameraSpeed * delta_t;
+            if (g_DPressed) g_NewPlayerPosition = g_PlayerPosition + adMoveDirection * cameraSpeed * delta_t;
 
+        }
         if (g_SpacebarPressed) g_NewPlayerPosition = glm::vec4(
             g_NewPlayerPosition.x, 
             g_NewPlayerPosition.y + 0.15f, 
@@ -589,6 +944,75 @@ std::map<std::string, bool> CheckCollision() {
         touchedGround = true;
     else
         touchedGround = false;
+
+    std::map<std::string, bool> collisions;
+    collisions["x"] = collisionX;
+    collisions["y"] = collisionY;
+    collisions["z"] = collisionZ;
+
+    return collisions;
+}
+std::map<std::string, bool> CheckCollisionLevel2() {
+    bool collisionX = false;
+    bool collisionY = false;
+    bool collisionZ = false;
+    SceneObject &player = g_VirtualScene["player"];
+
+    for (SceneObject platform : g_HitBoxes) {
+        player.bottom_left_back = glm::vec3(
+            g_NewPlayerPosition.x+player.bbox_min.x,
+            g_NewPlayerPosition.y+player.bbox_min.y,
+            g_NewPlayerPosition.z+player.bbox_min.z
+        );
+        player.up_right_front = glm::vec3(
+            g_NewPlayerPosition.x+player.bbox_max.x,
+            g_NewPlayerPosition.y+player.bbox_max.y,
+            g_NewPlayerPosition.z+player.bbox_max.z
+        );
+
+        collisionX = player.up_right_front.x >= platform.bottom_left_back.x
+                   && platform.up_right_front.x >= player.bottom_left_back.x;
+        collisionY = player.up_right_front.y >= platform.bottom_left_back.y
+                   && platform.up_right_front.y >= player.bottom_left_back.y;
+        collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
+                   && platform.up_right_front.z >= player.bottom_left_back.z;
+
+       if (collisionX && collisionY && collisionZ) break;
+    }
+    if (collisionX && collisionY && collisionZ)
+        touchedGround = true;
+    else
+        touchedGround = false;
+
+    std::map<std::string, bool> collisions;
+    collisions["x"] = collisionX;
+    collisions["y"] = collisionY;
+    collisions["z"] = collisionZ;
+
+    return collisions;
+}
+
+std::map<std::string, bool> CheckKeyCollision() {
+    bool collisionX = false;
+    bool collisionY = false;
+    bool collisionZ = false;
+    //SceneObject &player = g_VirtualScene["player"];
+
+    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+
+    for (SceneObject key : g_KeyHitBoxes) {
+
+        collisionX = player.up_right_front.x >= key.bottom_left_back.x
+                   && key.up_right_front.x >= player.bottom_left_back.x;
+        collisionY = player.up_right_front.y >= key.bottom_left_back.y
+                   && key.up_right_front.y >= player.bottom_left_back.y;
+        collisionZ = player.up_right_front.z >= key.bottom_left_back.z
+                   && key.up_right_front.z >= player.bottom_left_back.z;
+
+       if (collisionX && collisionY && collisionZ) break;
+    }
+
 
     std::map<std::string, bool> collisions;
     collisions["x"] = collisionX;
@@ -801,7 +1225,7 @@ int main(int argc, char* argv[])
         glm::vec4 camera_forward_vetor = camera_view_vector;
         glm::vec4 camera_left_vetor = glm::vec4(x2, y, z2, 0.0f);
 
-        DrawLevel2();
+        DrawLevel1();
         MovePlayer(camera_view_vector, camera_up_vector, delta_t);
          std::map<std::string, bool> collisions = CheckCollision();
         if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
@@ -827,7 +1251,13 @@ int main(int argc, char* argv[])
         MoveBullet();
         if(CheckBulletCollision() || fell()){
             std::cout << "DIED" << std::endl;
-            diedRoutine();
+            //diedRoutine();
+        }
+
+        std::map<std::string, bool> keycollisions = CheckKeyCollision();
+        if ((keycollisions["x"] && keycollisions["y"] && keycollisions["z"])) {
+            //std::cout << "key collide" << std::endl;
+            changeLevel = true;
         }
         current_time = glfwGetTime();
         delta_t = current_time - previous_time;
@@ -919,7 +1349,90 @@ int main(int argc, char* argv[])
         // definidas anteriormente usando glfwSet*Callback() serão chamadas
         // pela biblioteca GLFW.
         glfwPollEvents();
+        g_KeyHitBoxes.clear();
+
+        if(changeLevel){
+            break;
+        }
+
     }
+LoadShadersFromFilesLevel2();
+    LoadAllObjFilesLevel2();
+    LoadAllTexturesLevel2();
+g_PlayerPosition = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+    g_NewPlayerPosition = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+
+    initializeBezierCurves();
+    changeLevel = true;
+    while (!glfwWindowShouldClose(window)) {
+        // Inicialização
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(program_id);
+
+        //glBindVertexArray(vertex_array_object_id);
+
+        float r = g_CameraDistance;
+        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        float y = r*sin(g_CameraPhi);
+        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+
+        glm::vec4 camera_position_c = glm::vec4(x+g_PlayerPosition.x, y+g_PlayerPosition.y, z+g_PlayerPosition.z, 1.0f);
+        glm::vec4 camera_lookat_l = g_PlayerPosition;
+        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c;
+        glm::vec4 camera_up_vector = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+
+        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        glUniformMatrix4fv(view_uniform, 1, GL_FALSE, glm::value_ptr(view));
+
+        // vvvvvvvv Cálculos relacionados à matriz "projection" vvvvvvvv
+        glm::mat4 projection;
+        // O bloco deve se mover como uma câmera livre ao pressionar as teclas
+        // WASD. Quando o mouse for movido, deve ser aplicada uma câmera look-at com o bloco (personagem) centralizado.
+
+        glm::mat4 model = Matrix_Identity()
+                * Matrix_Translate(
+                    g_PlayerPosition.x,
+                    g_PlayerPosition.y,
+                    g_PlayerPosition.z
+                )
+                * Matrix_Rotate_Y(g_CameraTheta) * Matrix_Rotate_Y(3.1415);
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(object_id_uniform, PLAYER);
+        DrawVirtualObject("player");
+
+        float nearplane = -0.1f;
+        float farplane = -50.0f;
+
+        float fieldOfView = 3.141592 / 3.0f;
+        projection = Matrix_Perspective(fieldOfView, g_ScreenRatio, nearplane, farplane);
+        glUniformMatrix4fv(projection_uniform, 1, GL_FALSE, glm::value_ptr(projection));
+        // ^^^^^^^^^ Cálculos relacionados à matriz "projection" ^^^^^^^^^
+
+        
+        DrawLevel2();
+        MovePlayer(camera_view_vector, camera_up_vector, delta_t);
+        std::map<std::string, bool> collisions = CheckCollisionLevel2();
+        if (!(collisions["x"] && collisions["y"] && collisions["z"])) {
+            g_NewPlayerPosition = glm::vec4(g_NewPlayerPosition.x, g_NewPlayerPosition.y-(delta_t*cameraSpeed*3), g_NewPlayerPosition.z, g_NewPlayerPosition.w);
+        }
+        g_HitBoxes.clear();
+        g_KeyHitBoxes.clear();
+        g_PlayerPosition = g_NewPlayerPosition;
+
+        glBindVertexArray(0);
+
+        current_time = glfwGetTime();
+        delta_t = current_time - previous_time;
+        previous_time = current_time;
+        g_CurrentTime = glfwGetTime();
+
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+
 
     // Finalizamos o uso dos recursos do sistema operacional
     glfwTerminate();
@@ -1063,10 +1576,31 @@ void LoadShadersFromFiles()
     glUseProgram(program_id);
     glUniform1i(glGetUniformLocation(program_id, "PlatformTexture"), PLATFORM);
     glUniform1i(glGetUniformLocation(program_id, "KeyTexture"), KEY);
+    glUniform1i(glGetUniformLocation(program_id, "PlayerTexture"), PLAYER);
     glUniform1i(glGetUniformLocation(program_id, "CannonTexture"), CANNON);
     glUseProgram(0);
 }
+void LoadShadersFromFilesLevel2() {
+    vertex_shader_id = LoadShader_Vertex("../../src/shader_vertex_level2.glsl");
+    fragment_shader_id = LoadShader_Fragment("../../src/shader_fragment_level2.glsl");
 
+    if (program_id != 0) glDeleteProgram(program_id);
+
+    program_id = CreateGpuProgram(vertex_shader_id, fragment_shader_id);
+
+    model_uniform           = glGetUniformLocation(program_id, "model");
+    view_uniform            = glGetUniformLocation(program_id, "view");
+    projection_uniform      = glGetUniformLocation(program_id, "projection");
+    object_id_uniform       = glGetUniformLocation(program_id, "object_id");
+    bbox_min_uniform        = glGetUniformLocation(program_id, "bbox_min");
+    bbox_max_uniform        = glGetUniformLocation(program_id, "bbox_max");
+
+    glUseProgram(program_id);
+    glUniform1i(glGetUniformLocation(program_id, "PlatformTexture"), PLATFORM);
+    glUniform1i(glGetUniformLocation(program_id, "PlayerTexture"), PLAYER);
+    glUniform1i(glGetUniformLocation(program_id, "KeyTexture"), KEY);
+    glUseProgram(0);
+}
 // Função que pega a matriz M e guarda a mesma no topo da pilha
 void PushMatrix(glm::mat4 M)
 {

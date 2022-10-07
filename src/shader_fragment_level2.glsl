@@ -4,6 +4,7 @@ in vec4 position_world;
 in vec4 normal;
 in vec4 position_model;
 in vec3 rasterized_color;
+in vec3 vertex_color;
 in vec2 texcoords;
 
 uniform mat4 model;
@@ -13,16 +14,14 @@ uniform mat4 projection;
 #define PLATFORM 0
 #define PLAYER 1
 #define KEY 2
-#define CANNON 3
 uniform int object_id;
 
 uniform vec4 bbox_min;
 uniform vec4 bbox_max;
 
 uniform sampler2D PlatformTexture;
-uniform sampler2D KeyTexture;
-uniform sampler2D CannonTexture;
 uniform sampler2D PlayerTexture;
+uniform sampler2D KeyTexture;
 
 out vec4 color;
 
@@ -51,7 +50,7 @@ void main() {
     float U;
     float V;
 
-    if (object_id == PLATFORM || object_id == CANNON) {
+    if (object_id == PLATFORM) {
         float minx = bbox_min.x;
         float maxx = bbox_max.x;
 
@@ -73,21 +72,16 @@ void main() {
         Ks = vec3(0.01,0.0,0.0);
         Ka = vec3(0.2,0.1,0.0);
         Kd0 = texture(PlatformTexture, vec2(U,V)).rgb;
-    }else if (object_id == PLAYER) {
+    } else if (object_id == PLAYER) {
         Kd = vec3(0.3,0.3,0.3);
         Ks = vec3(0.01,0.0,0.0);
         Ka = vec3(0.2,0.1,0.0);
         Kd0 = texture(PlayerTexture, vec2(U,V)).rgb;
-    } else if (object_id == KEY){
+    } else if (object_id == KEY) {
         Kd = vec3(1.0,1.0,0.0);
         Ks = vec3(0.01,0.01,0.0);
         Ka = vec3(1.0,1.0,0.0);
         Kd0 = texture(KeyTexture, vec2(U,V)).rgb;
-        qLine = 2;
-    }else if(object_id == CANNON){
-       Kd = vec3(0.02,0.02,0.02);
-        Ks = vec3(0.02,0.02,0.02);
-        Ka = vec3(0.02,0.02,0.02);
         qLine = 2;
     }
 
@@ -104,16 +98,17 @@ void main() {
     vec3 ambient_term = Ka*Ia;
 
     // Termo especular de Blinn-Phong
-    vec3 specular_term = Ks*I*pow(max(0,dot(n, h)), qLine);
+    vec3 specular_term = Ks*I*pow(max(dot(n, h), 0), qLine);
 
     if (object_id == KEY) {
-        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + specular_term;
-    } else if (object_id == CANNON){
-        color.rgb = ambient_term + lambert_diffuse_term;
-    }else{
+        // Aplicando o modelo de iluminação de Blinn-Phong no objeto da chave
+        color.rgb = Kd0 + ambient_term + lambert_diffuse_term + specular_term + vertex_color;
+    } else if (object_id != PLAYER) {
+        // Aplicando o modelo de iluminação de Phong nos objetos da cena
         color.rgb = Kd0 + ambient_term + lambert_diffuse_term;
+    } else {
+        color.rgb = vertex_color;
     }
 
-    //color.rgb = rasterized_color;
     color.rgb = pow(color.rgb, vec3(1.0,1.0,1.0)/2.2);
 }
