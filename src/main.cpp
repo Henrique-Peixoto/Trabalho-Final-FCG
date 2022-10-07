@@ -50,6 +50,7 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+#include "collisions.h"
 float PI = 3.14159265359f;
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -138,18 +139,18 @@ void LoadAllTextures();
 
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
-struct SceneObject
-{
-    std::string  name;        // Nome do objeto
-    size_t       first_index; // Índice do primeiro vértice dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    size_t       num_indices; // Número de índices do objeto dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
-    GLenum       rendering_mode; // Modo de rasterização (GL_TRIANGLES, GL_TRIANGLE_STRIP, etc.)
-    GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
-    glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
-    glm::vec3    bbox_max;
-    glm::vec3 bottom_left_back;
-    glm::vec3 up_right_front;
-};
+// struct SceneObject
+// {
+//     std::string  name;        // Nome do objeto
+//     size_t       first_index; // Índice do primeiro vértice dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
+//     size_t       num_indices; // Número de índices do objeto dentro do vetor indices[] definido em BuildTrianglesAndAddToVirtualScene()
+//     GLenum       rendering_mode; // Modo de rasterização (GL_TRIANGLES, GL_TRIANGLE_STRIP, etc.)
+//     GLuint       vertex_array_object_id; // ID do VAO onde estão armazenados os atributos do modelo
+//     glm::vec3    bbox_min; // Axis-Aligned Bounding Box do objeto
+//     glm::vec3    bbox_max;
+//     glm::vec3 bottom_left_back;
+//     glm::vec3 up_right_front;
+// };
 
 // Abaixo definimos variáveis globais utilizadas em várias funções do código.
 
@@ -259,8 +260,8 @@ typedef struct cameraPlayer{
 CameraPlayer player;
 
 // Colisões
-std::map<std::string, bool> CheckCollision();
-bool CheckBulletCollision();
+// std::map<std::string, bool> CheckCollision();
+// bool CheckBulletCollision();
 void CalculateHitBox(std::string objName, float x, float y, float z, float scaleFactorX = 1.0, float scaleFactorY = 1.0, float scaleFactorZ = 1.0);
 std::vector<SceneObject> g_HitBoxes;
 std::vector<SceneObject> g_KeyHitBoxes;
@@ -344,10 +345,10 @@ bool changeLevel = false;
 
 float spherePositionX = 0.0f;
 
-typedef struct spawnAttr{
-    glm::vec3 spawnPos;
-    glm::vec3 spawnVec;
-}SPAWNATTR;
+// typedef struct spawnAttr{
+//     glm::vec3 spawnPos;
+//     glm::vec3 spawnVec;
+// }SPAWNATTR;
 //Posicao , vetor
 std::vector<SPAWNATTR> bulletPosition;
 
@@ -919,140 +920,140 @@ void MovePlayer(glm::vec4 camera_view_vector, glm::vec4 camera_up_vector, float 
         );
 }
 
-std::map<std::string, bool> CheckCollision() {
-    bool collisionX = false;
-    bool collisionY = false;
-    bool collisionZ = false;
-    //SceneObject &player = g_VirtualScene["player"];
+// std::map<std::string, bool> CheckCollision() {
+//     bool collisionX = false;
+//     bool collisionY = false;
+//     bool collisionZ = false;
+//     //SceneObject &player = g_VirtualScene["player"];
 
     
-    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
-    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+//     player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+//     player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
 
-    for (SceneObject platform : g_HitBoxes) {
+//     for (SceneObject platform : g_HitBoxes) {
 
-        collisionX = player.up_right_front.x >= platform.bottom_left_back.x
-                   && platform.up_right_front.x >= player.bottom_left_back.x;
-        collisionY = player.up_right_front.y >= platform.bottom_left_back.y
-                   && platform.up_right_front.y >= player.bottom_left_back.y;
-        collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
-                   && platform.up_right_front.z >= player.bottom_left_back.z;
+//         collisionX = player.up_right_front.x >= platform.bottom_left_back.x
+//                    && platform.up_right_front.x >= player.bottom_left_back.x;
+//         collisionY = player.up_right_front.y >= platform.bottom_left_back.y
+//                    && platform.up_right_front.y >= player.bottom_left_back.y;
+//         collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
+//                    && platform.up_right_front.z >= player.bottom_left_back.z;
 
-       if (collisionX && collisionY && collisionZ) break;
-    }
-    if (collisionX && collisionY && collisionZ)
-        touchedGround = true;
-    else
-        touchedGround = false;
+//        if (collisionX && collisionY && collisionZ) break;
+//     }
+//     if (collisionX && collisionY && collisionZ)
+//         touchedGround = true;
+//     else
+//         touchedGround = false;
 
-    std::map<std::string, bool> collisions;
-    collisions["x"] = collisionX;
-    collisions["y"] = collisionY;
-    collisions["z"] = collisionZ;
+//     std::map<std::string, bool> collisions;
+//     collisions["x"] = collisionX;
+//     collisions["y"] = collisionY;
+//     collisions["z"] = collisionZ;
 
-    return collisions;
-}
-std::map<std::string, bool> CheckCollisionLevel2() {
-    bool collisionX = false;
-    bool collisionY = false;
-    bool collisionZ = false;
-    SceneObject &player = g_VirtualScene["player"];
+//     return collisions;
+// }
+// std::map<std::string, bool> CheckCollisionLevel2() {
+//     bool collisionX = false;
+//     bool collisionY = false;
+//     bool collisionZ = false;
+//     SceneObject &player = g_VirtualScene["player"];
 
-    for (SceneObject platform : g_HitBoxes) {
-        player.bottom_left_back = glm::vec3(
-            g_NewPlayerPosition.x+player.bbox_min.x,
-            g_NewPlayerPosition.y+player.bbox_min.y,
-            g_NewPlayerPosition.z+player.bbox_min.z
-        );
-        player.up_right_front = glm::vec3(
-            g_NewPlayerPosition.x+player.bbox_max.x,
-            g_NewPlayerPosition.y+player.bbox_max.y,
-            g_NewPlayerPosition.z+player.bbox_max.z
-        );
+//     for (SceneObject platform : g_HitBoxes) {
+//         player.bottom_left_back = glm::vec3(
+//             g_NewPlayerPosition.x+player.bbox_min.x,
+//             g_NewPlayerPosition.y+player.bbox_min.y,
+//             g_NewPlayerPosition.z+player.bbox_min.z
+//         );
+//         player.up_right_front = glm::vec3(
+//             g_NewPlayerPosition.x+player.bbox_max.x,
+//             g_NewPlayerPosition.y+player.bbox_max.y,
+//             g_NewPlayerPosition.z+player.bbox_max.z
+//         );
 
-        collisionX = player.up_right_front.x >= platform.bottom_left_back.x
-                   && platform.up_right_front.x >= player.bottom_left_back.x;
-        collisionY = player.up_right_front.y >= platform.bottom_left_back.y
-                   && platform.up_right_front.y >= player.bottom_left_back.y;
-        collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
-                   && platform.up_right_front.z >= player.bottom_left_back.z;
+//         collisionX = player.up_right_front.x >= platform.bottom_left_back.x
+//                    && platform.up_right_front.x >= player.bottom_left_back.x;
+//         collisionY = player.up_right_front.y >= platform.bottom_left_back.y
+//                    && platform.up_right_front.y >= player.bottom_left_back.y;
+//         collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
+//                    && platform.up_right_front.z >= player.bottom_left_back.z;
 
-       if (collisionX && collisionY && collisionZ) break;
-    }
-    if (collisionX && collisionY && collisionZ)
-        touchedGround = true;
-    else
-        touchedGround = false;
+//        if (collisionX && collisionY && collisionZ) break;
+//     }
+//     if (collisionX && collisionY && collisionZ)
+//         touchedGround = true;
+//     else
+//         touchedGround = false;
 
-    std::map<std::string, bool> collisions;
-    collisions["x"] = collisionX;
-    collisions["y"] = collisionY;
-    collisions["z"] = collisionZ;
+//     std::map<std::string, bool> collisions;
+//     collisions["x"] = collisionX;
+//     collisions["y"] = collisionY;
+//     collisions["z"] = collisionZ;
 
-    return collisions;
-}
+//     return collisions;
+// }
 
-std::map<std::string, bool> CheckKeyCollision() {
-    bool collisionX = false;
-    bool collisionY = false;
-    bool collisionZ = false;
-    //SceneObject &player = g_VirtualScene["player"];
+// std::map<std::string, bool> CheckKeyCollision() {
+//     bool collisionX = false;
+//     bool collisionY = false;
+//     bool collisionZ = false;
+//     //SceneObject &player = g_VirtualScene["player"];
 
-    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
-    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+//     player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+//     player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
 
-    for (SceneObject key : g_KeyHitBoxes) {
+//     for (SceneObject key : g_KeyHitBoxes) {
 
-        collisionX = player.up_right_front.x >= key.bottom_left_back.x
-                   && key.up_right_front.x >= player.bottom_left_back.x;
-        collisionY = player.up_right_front.y >= key.bottom_left_back.y
-                   && key.up_right_front.y >= player.bottom_left_back.y;
-        collisionZ = player.up_right_front.z >= key.bottom_left_back.z
-                   && key.up_right_front.z >= player.bottom_left_back.z;
+//         collisionX = player.up_right_front.x >= key.bottom_left_back.x
+//                    && key.up_right_front.x >= player.bottom_left_back.x;
+//         collisionY = player.up_right_front.y >= key.bottom_left_back.y
+//                    && key.up_right_front.y >= player.bottom_left_back.y;
+//         collisionZ = player.up_right_front.z >= key.bottom_left_back.z
+//                    && key.up_right_front.z >= player.bottom_left_back.z;
 
-       if (collisionX && collisionY && collisionZ) break;
-    }
+//        if (collisionX && collisionY && collisionZ) break;
+//     }
 
 
-    std::map<std::string, bool> collisions;
-    collisions["x"] = collisionX;
-    collisions["y"] = collisionY;
-    collisions["z"] = collisionZ;
+//     std::map<std::string, bool> collisions;
+//     collisions["x"] = collisionX;
+//     collisions["y"] = collisionY;
+//     collisions["z"] = collisionZ;
 
-    return collisions;
-}
+//     return collisions;
+// }
 inline float squared(float v) { return v * v; }
-bool CheckBulletCollision() {
-    player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
-    player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
+// bool CheckBulletCollision() {
+//     player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
+//     player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
 
 
-    int idx = 0;
-    bool colidiu = false;
-    bool popFront = false;
-    std::vector<SPAWNATTR> newBulletPosition;
-    for(int i=0;i<bulletPosition.size();i++){
-        SPAWNATTR bPos = bulletPosition[i];
-        float sphereXDistance = abs(bPos.spawnPos.x - camera_position_c.x);
-        float sphereYDistance = abs(bPos.spawnPos.y - camera_position_c.y);
-        float sphereZDistance = abs(bPos.spawnPos.z - camera_position_c.z);
+//     int idx = 0;
+//     bool colidiu = false;
+//     bool popFront = false;
+//     std::vector<SPAWNATTR> newBulletPosition;
+//     for(int i=0;i<bulletPosition.size();i++){
+//         SPAWNATTR bPos = bulletPosition[i];
+//         float sphereXDistance = abs(bPos.spawnPos.x - camera_position_c.x);
+//         float sphereYDistance = abs(bPos.spawnPos.y - camera_position_c.y);
+//         float sphereZDistance = abs(bPos.spawnPos.z - camera_position_c.z);
 
         
    
-        float cornerDistance_sq = ((sphereXDistance) * (sphereXDistance)) +
-                         ((sphereYDistance) * (sphereYDistance) +
-                         ((sphereZDistance) * (sphereZDistance)));
-        colidiu |= (cornerDistance_sq < (0.4f * 0.4f));
-        if(cornerDistance_sq < 200.0f){
-            newBulletPosition.push_back(bulletPosition[i]);
-        }
-    }
-    bulletPosition = newBulletPosition;
+//         float cornerDistance_sq = ((sphereXDistance) * (sphereXDistance)) +
+//                          ((sphereYDistance) * (sphereYDistance) +
+//                          ((sphereZDistance) * (sphereZDistance)));
+//         colidiu |= (cornerDistance_sq < (0.4f * 0.4f));
+//         if(cornerDistance_sq < 200.0f){
+//             newBulletPosition.push_back(bulletPosition[i]);
+//         }
+//     }
+//     bulletPosition = newBulletPosition;
 
 
-    return colidiu;
+//     return colidiu;
 
-}
+// }
 
 void spawnBullet(glm::vec3 spawnPos, glm::vec3 spawnVec){
     SPAWNATTR sp;
