@@ -27,43 +27,7 @@ typedef struct spawnAttr{
     glm::vec3 spawnVec;
 }SPAWNATTR;
 
-// std::map<std::string, bool> CheckCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition) {
-//     bool collisionX = false;
-//     bool collisionY = false;
-//     bool collisionZ = false;
-//     //SceneObject &player = g_VirtualScene["player"];
-
-//     for (SceneObject platform : g_HitBoxes) {
-//         player.bottom_left_back = glm::vec3(
-//             g_NewPlayerPosition.x+player.bbox_min.x,
-//             g_NewPlayerPosition.y+player.bbox_min.y,
-//             g_NewPlayerPosition.z+player.bbox_min.z
-//         );
-//         player.up_right_front = glm::vec3(
-//             g_NewPlayerPosition.x+player.bbox_max.x,
-//             g_NewPlayerPosition.y+player.bbox_max.y,
-//             g_NewPlayerPosition.z+player.bbox_max.z
-//         );
-
-//         collisionX = player.up_right_front.x >= platform.bottom_left_back.x
-//                    && platform.up_right_front.x >= player.bottom_left_back.x;
-//         collisionY = player.up_right_front.y >= platform.bottom_left_back.y
-//                    && platform.up_right_front.y >= player.bottom_left_back.y;
-//         collisionZ = player.up_right_front.z >= platform.bottom_left_back.z
-//                    && platform.up_right_front.z >= player.bottom_left_back.z;
-
-//        if (collisionX && collisionY && collisionZ) break;
-//     }
-
-//     std::map<std::string, bool> collisions;
-//     collisions["x"] = collisionX;
-//     collisions["y"] = collisionY;
-//     collisions["z"] = collisionZ;
-
-//     return collisions;
-// }
-
-std::map<std::string, bool> CheckCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition) {
+std::pair<std::map<std::string, bool>, bool> CheckCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition, bool touchedGround) {
     bool collisionX = false;
     bool collisionY = false;
     bool collisionZ = false;
@@ -94,9 +58,9 @@ std::map<std::string, bool> CheckCollision(SceneObject player, std::vector<Scene
     collisions["y"] = collisionY;
     collisions["z"] = collisionZ;
 
-    return collisions;
+    return { collisions, touchedGround };
 }
-std::map<std::string, bool> CheckCollisionLevel2(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition) {
+std::pair<std::map<std::string, bool>, bool> CheckCollisionLevel2(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition, bool touchedGround) {
     bool collisionX = false;
     bool collisionY = false;
     bool collisionZ = false;
@@ -133,10 +97,10 @@ std::map<std::string, bool> CheckCollisionLevel2(SceneObject player, std::vector
     collisions["y"] = collisionY;
     collisions["z"] = collisionZ;
 
-    return collisions;
+    return { collisions, touchedGround };
 }
 
-std::map<std::string, bool> CheckKeyCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition) {
+std::map<std::string, bool> CheckKeyCollision(SceneObject player, std::vector<SceneObject> g_KeyHitBoxes, glm::vec4 g_NewPlayerPosition) {
     bool collisionX = false;
     bool collisionY = false;
     bool collisionZ = false;
@@ -166,16 +130,13 @@ std::map<std::string, bool> CheckKeyCollision(SceneObject player, std::vector<Sc
     return collisions;
 }
 
-bool CheckBulletCollision(SceneObject player, glm::vec4 g_NewPlayerPosition) {
+bool CheckBulletCollision(SceneObject player, glm::vec4 g_NewPlayerPosition, std::vector<SPAWNATTR> bulletPosition, glm::vec4 camera_position_c) {
     player.bottom_left_back = g_NewPlayerPosition + glm::vec4(-0.5f,-1.5f,-0.5f,1.0f);
     player.up_right_front = g_NewPlayerPosition + glm::vec4(0.5f,1.5f,0.5f,1.0f);
 
-
-    int idx = 0;
     bool colidiu = false;
-    bool popFront = false;
     std::vector<SPAWNATTR> newBulletPosition;
-    for(int i=0;i<bulletPosition.size();i++){
+    for(unsigned int i = 0; i < bulletPosition.size(); i++){
         SPAWNATTR bPos = bulletPosition[i];
         float sphereXDistance = abs(bPos.spawnPos.x - camera_position_c.x);
         float sphereYDistance = abs(bPos.spawnPos.y - camera_position_c.y);

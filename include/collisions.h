@@ -10,6 +10,8 @@
 
 #include <bits/stdc++.h>
 
+// Definimos uma estrutura que armazenará dados necessários para renderizar
+// cada objeto da cena virtual.
 struct SceneObject {
     std::string name;
     size_t first_index;
@@ -22,13 +24,14 @@ struct SceneObject {
     glm::vec3 up_right_front;
 };
 
+// Estrutura para definir a posição da bala de canhão
 typedef struct spawnAttr{
     glm::vec3 spawnPos;
     glm::vec3 spawnVec;
 }SPAWNATTR;
 
-bool CheckCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition);
-std::map<std::string, bool> CheckCollisionLevel2(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition);
-std::map<std::string, bool> CheckKeyCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition);
-bool CheckBulletCollision(SceneObject player, glm::vec4 g_NewPlayerPosition);
+std::pair<std::map<std::string, bool>, bool> CheckCollision(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition, bool touchedGround);
+std::pair<std::map<std::string, bool>, bool> CheckCollisionLevel2(SceneObject player, std::vector<SceneObject> g_HitBoxes, glm::vec4 g_NewPlayerPosition, bool touchedGround);
+std::map<std::string, bool> CheckKeyCollision(SceneObject player, std::vector<SceneObject> g_KeyHitBoxes, glm::vec4 g_NewPlayerPosition);
+bool CheckBulletCollision(SceneObject player, glm::vec4 g_NewPlayerPosition, std::vector<SPAWNATTR> bulletPosition, glm::vec4 camera_position_c);
 #endif //_COLLISIONS_H
