@@ -39,7 +39,7 @@ void main() {
     vec4 l = normalize(vec4(1.0,1.0,0.0,0.0));
     vec4 v = normalize(camera_position - p);
     vec4 r = -l+2*n*(dot(n, l));
-    vec4 h = (v+l)/normalize(v+l);
+    vec4 h = normalize(v+l); // ou: (v+l)/length(v+l)
 
     // Parâmetros que definem as propriedades espectrais da superfície
     vec3 Kd; // Refletância difusa
